@@ -106,22 +106,43 @@ export default {
         "99": "0.99"
 },
       colors: {
-        gm: {
-          bg:        '#F5F4F2',
+        om: {
+          blue:      '#1E3A8A', // Azul Open Motor
+          'blue-lt': '#2563EB',
+          'blue-dk': '#172554',
+          'blue-bg': '#EFF6FF',
+          red:       '#C41E3A', // Rojo Open Motor
+          'red-lt':  '#DC2626',
+          'red-dk':  '#991B1B',
+          'red-bg':  '#FEF2F2',
+          bg:        '#F8FAFC',
           surface:   '#FFFFFF',
-          dark:      '#0B0B0D',
-          dark2:     '#141418',
-          dark3:     '#1C1C22',
-          red:       '#E11428',
-          'red-lt':  '#FF2E43',
-          'red-dk':  '#9E0E1B',
-          'red-bg':  '#FCEAEC',
-          text:      '#16161A',
-          muted:     '#6B6B73',
-          border:    '#E4E1DC',
-          success:   '#2D7D52',
-          danger:    '#C0392B',
-          info:      '#2C5F8A',
+          dark:      '#0A0F1D',
+          dark2:     '#111827',
+          dark3:     '#1E293B',
+          text:      '#0F172A',
+          muted:     '#64748B',
+          border:    '#E2E8F0',
+          success:   '#16A34A',
+          danger:    '#DC2626',
+          info:      '#0284C7',
+        },
+        gm: {
+          bg:        '#F8FAFC',
+          surface:   '#FFFFFF',
+          dark:      '#0A0F1D',
+          dark2:     '#111827',
+          dark3:     '#1E293B',
+          red:       '#C41E3A', // Reemplazado con el rojo de Open Motor
+          'red-lt':  '#DC2626',
+          'red-dk':  '#991B1B',
+          'red-bg':  '#FEF2F2',
+          text:      '#0F172A',
+          muted:     '#64748B',
+          border:    '#E2E8F0',
+          success:   '#16A34A',
+          danger:    '#DC2626',
+          info:      '#1E3A8A', // Reemplazado con el azul de Open Motor
         },
       },
       fontFamily: {

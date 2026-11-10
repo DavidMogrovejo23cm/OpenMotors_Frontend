@@ -11,8 +11,8 @@ const KEY = 'gm_theme';
 export function getTheme(): Theme {
   try {
     const t = localStorage.getItem(KEY);
-    return t === 'light' ? 'light' : 'dark';
-  } catch { return 'dark'; }
+    return t === 'dark' ? 'dark' : 'light'; // Por defecto claro
+  } catch { return 'light'; }
 }
 
 export function applyTheme(t: Theme) {

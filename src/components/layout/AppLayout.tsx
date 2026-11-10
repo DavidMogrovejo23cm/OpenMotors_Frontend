@@ -22,6 +22,7 @@ import MobileTabBar from '../mobile/MobileTabBar';
 import MobileMore from '../mobile/MobileMore';
 import { useTheme } from '../../lib/theme';
 import { Sun, Moon } from 'lucide-react';
+import Sidebar from './Sidebar';
 import { whatsappCitaLink } from '../../lib/constants';
 
 export default function AppLayout() {
@@ -31,6 +32,7 @@ export default function AppLayout() {
   const toast      = useToast();
   const { unread } = useNotifications();
   const [theme, toggleTheme] = useTheme();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   /* Cambiar/crear contraseña */
   const [pwOpen,    setPwOpen]    = useState(false);
@@ -338,67 +340,37 @@ export default function AppLayout() {
             <Menu size={18} style={{ color: topTextHi }} />
           </button>
 
-          {/* Logo */}
+          {/* Topbar Brand & Toggle */}
           <Link to="/dashboard" className="flex items-center gap-3 shrink-0 group">
             <div
               className="relative shrink-0 overflow-hidden bg-white p-0.5"
               style={{
-                width: 46, height: 46, borderRadius: 12,
-                boxShadow: '0 0 0 2px rgba(225,20,40,0.35), 0 4px 20px rgba(225,20,40,0.2)',
+                width: 44, height: 44, borderRadius: 10,
+                boxShadow: '0 0 0 2px rgba(30,58,138,0.2), 0 4px 14px rgba(30,58,138,0.15)',
                 transition: 'box-shadow 200ms',
               }}
             >
               <img src="/brand/open-motor-logo.png" alt="Open Motors" className="w-full h-full object-contain" />
-              <div className="absolute inset-0"
-                   style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.08) 0%,transparent 60%)' }} />
             </div>
             <div style={{ lineHeight: 1 }}>
-              <span
-                className="font-black drop-shadow-lg text-[22px] sm:text-[30px] tracking-tight"
-                style={{ fontWeight: 900, color: topBrand }}
-              >
-                OPEN <span style={{
-                  background: 'linear-gradient(135deg, #FF3B47 0%, #E11428 60%, #C00018 100%)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                }}>MOTORS</span>
-              </span>
+              <div className="flex items-center gap-1 font-black text-[20px] sm:text-[24px] tracking-tight">
+                <span className="text-blue-900 dark:text-blue-400">OPEN</span>
+                <span className="text-[#C41E3A]">MOTOR</span>
+              </div>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                Servicio Automotriz
+              </p>
             </div>
           </Link>
 
           {/* Divisor desktop */}
           <div className="hidden lg:block w-px h-8 bg-white/[0.06] shrink-0" />
 
-          {/* Nav — solo desktop */}
-          <nav className="hidden md:flex items-center gap-0.5 flex-1 overflow-x-auto overflow-y-hidden whitespace-nowrap no-scrollbar pb-1 -mb-1"
-               style={{ WebkitOverflowScrolling: 'touch' }}>
-            {NAV.map(({ label, to }) => {
-              const active = location.pathname === to || location.pathname.startsWith(to + '/');
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  className="relative px-3 py-2 rounded-lg text-[11.5px] font-bold tracking-[0.12em] uppercase transition-all duration-150"
-                  style={active ? {
-                    color: isDark ? '#fff' : '#16161A',
-                    background: 'rgba(225,20,40,0.15)',
-                    boxShadow: '0 0 0 1px rgba(225,20,40,0.3)',
-                  } : {
-                    color: topText,
-                  }}
-                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.color = topTextHi; }}
-                  onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.color = topText; }}
-                >
-                  {active && (
-                    <span
-                      className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full"
-                      style={{ background: '#E11428', boxShadow: '0 0 8px rgba(225,20,40,0.8)' }}
-                    />
-                  )}
-                  {label}
-                </Link>
-              );
-            })}
-
+          {/* Nav horizontal simplificado / enlaces rápidos en desktop */}
+          <nav className="hidden lg:flex items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar pl-2">
+            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-2">
+              Taller Automotriz
+            </span>
           </nav>
 
           {/* Menú "Más" — FUERA del <nav> (el overflow del nav recortaba el desplegable) */}
@@ -590,9 +562,17 @@ export default function AppLayout() {
         </div>
       </header>
 
-      {/* ══ CONTENIDO ═══════════════════════════════════════════════ */}
-      <main className="flex-1">
-        <motion.div
+      {/* ══ CUERPO PRINCIPAL CON SIDEBAR LATERAL ══ */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar Lateral en Desktop */}
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+
+        {/* ══ CONTENIDO DE CADA PÁGINA ════════════════════════════════ */}
+        <main className="flex-1 overflow-y-auto min-h-[calc(100vh-62px)]">
+          <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -606,7 +586,8 @@ export default function AppLayout() {
               <Outlet />
             </ErrorBoundary>
           </motion.div>
-      </main>
+        </main>
+      </div>
 
       {/* ══ BARRA DE TABS INFERIOR — solo en el APK ══ */}
       {isNativeApp && <MobileTabBar onMore={() => setMobileOpen(true)} />}

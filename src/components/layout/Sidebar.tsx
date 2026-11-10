@@ -1,43 +1,65 @@
-/* ─────────────────────────────────────────────
-   GMotors — Sidebar de navegación
-   Logout visible · roles · design refinado
-   ───────────────────────────────────────────── */
-
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Wrench, Package, Users,
-  Bike, LogOut, ChevronRight, UserCheck, ClipboardList,
-  CreditCard, Truck,
+  Car, LogOut, ChevronRight, UserCheck, ClipboardList,
+  CreditCard, Truck, Fuel, Bell, Award, BookOpen,
+  DollarSign, ChevronLeft, ChevronDown
 } from 'lucide-react';
+import { useState } from 'react';
 import { useAuth, type RoleName } from '../../contexts/AuthContext';
 import { initials, cn } from '../../lib/utils';
 
-const NAV: { to: string; label: string; icon: typeof LayoutDashboard; roles?: RoleName[] }[] = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles?: RoleName[];
+  badge?: string;
+}
+
+const PRINCIPAL_NAV: NavItem[] = [
   { to: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard                          },
-  { to: '/registros',   label: 'Registros',   icon: Wrench,       roles: ['ADMIN','MECANICO'] },
+  { to: '/registros',   label: 'Registros',   icon: Wrench,        roles: ['ADMIN','MECANICO'] },
   { to: '/diagnostico', label: 'Diagnóstico', icon: ClipboardList, roles: ['ADMIN','MECANICO'] },
-  { to: '/motos',       label: 'Motos',       icon: Bike                                      },
-  { to: '/clientes',    label: 'Clientes',    icon: UserCheck,    roles: ['ADMIN','MECANICO'] },
-  { to: '/inventario',   label: 'Inventario',   icon: Package,      roles: ['ADMIN','MECANICO'] },
-  { to: '/proveedores',  label: 'Proveedores',  icon: Truck,        roles: ['ADMIN','MECANICO'] },
-  { to: '/pagos',        label: 'Pagos',         icon: CreditCard,  roles: ['ADMIN']             },
-  { to: '/perfiles',     label: 'Perfiles',      icon: Users,        roles: ['ADMIN']             },
+  { to: '/motos',       label: 'Vehículos',   icon: Car                                      },
+  { to: '/clientes',    label: 'Clientes',    icon: UserCheck,     roles: ['ADMIN','MECANICO'] },
+  { to: '/inventario',  label: 'Inventario',  icon: Package,       roles: ['ADMIN','MECANICO'] },
+  { to: '/proveedores', label: 'Proveedores', icon: Truck,         roles: ['ADMIN','MECANICO'] },
 ];
 
-export default function Sidebar() {
-  const { user, logout, hasRole, isAdmin } = useAuth();
+const SECONDARY_NAV: NavItem[] = [
+  { to: '/alertas',      label: 'Alertas',      icon: Bell,        roles: ['ADMIN','MECANICO'] },
+  { to: '/combustible',  label: 'Combustible',  icon: Fuel                                     },
+  { to: '/puntos',       label: 'Puntos Bonus', icon: Award                                    },
+  { to: '/metodologia',  label: 'Metodología',  icon: BookOpen,    roles: ['ADMIN','MECANICO'] },
+  { to: '/contabilidad', label: 'Contabilidad', icon: DollarSign,  roles: ['ADMIN','MECANICO'] },
+  { to: '/pagos',        label: 'Pagos',        icon: CreditCard,  roles: ['ADMIN']            },
+  { to: '/perfiles',     label: 'Perfiles',     icon: Users,       roles: ['ADMIN']            },
+];
+
+interface SidebarProps {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export default function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
+  const { user, logout, hasRole, isAdmin, isMecanico } = useAuth();
   const navigate = useNavigate();
+  const [showSecondary, setShowSecondary] = useState(true);
 
-  const navItems = NAV.filter((item) => !item.roles || hasRole(...item.roles));
+  const filterByRole = (items: NavItem[]) => items.filter((item) => !item.roles || hasRole(...item.roles));
 
-  const roleLabel = isAdmin         ? 'Administrador'
-    : hasRole('MECANICO')           ? 'Mecánico'
-    : hasRole('CLIENTE')            ? 'Cliente'
+  const mainItems = filterByRole(PRINCIPAL_NAV);
+  const secondaryItems = filterByRole(SECONDARY_NAV);
+
+  const roleLabel = isAdmin ? 'Administrador'
+    : isMecanico ? 'Mecánico'
+    : hasRole('CLIENTE') ? 'Cliente'
     : 'Usuario';
 
-  const roleColor = isAdmin         ? 'text-gm-red'
-    : hasRole('MECANICO')           ? 'text-blue-400'
-    : 'text-emerald-400';
+  const roleBadgeBg = isAdmin ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/40'
+    : isMecanico ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/40'
+    : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40';
 
   const handleLogout = () => {
     logout();
@@ -45,83 +67,160 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="gm-sidebar fixed inset-y-0 left-0 w-64 flex flex-col z-30"
-      style={{ background: 'linear-gradient(180deg,#131317 0%,#0f0f13 100%)', borderRight:'1px solid rgba(255,255,255,0.05)' }}>
-
-      {/* ── Logo ── */}
-      <div className="px-5 pt-5 pb-4 border-b border-white/[0.05]">
-        <div className="flex items-center gap-3">
-          <div className="relative w-10 h-10 rounded-xl overflow-hidden ring-1 ring-gm-red/20 shrink-0 bg-white p-0.5">
-            <img src="/brand/open-motor-logo.png" alt="Open Motors" className="w-full h-full object-contain" />
+    <aside
+      className={cn(
+        "hidden md:flex flex-col flex-shrink-0 transition-all duration-300 z-40",
+        "bg-white dark:bg-[#0E131F] border-r border-slate-200 dark:border-slate-800/80 shadow-sm",
+        collapsed ? "w-20" : "w-64"
+      )}
+      style={{ minHeight: 'calc(100vh - 62px)' }}
+    >
+      {/* ── Subheader / Toggle ── */}
+      <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/60">
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+              Navegación
+            </span>
           </div>
-          <div>
-            <p className="dark:text-white text-slate-900 font-black text-[17px] tracking-tight leading-none">
-              Open<span className="text-gm-red"> Motors</span>
-            </p>
-            <p className="dark:text-white/25 text-slate-900/25 text-[9px] font-semibold tracking-[0.28em] uppercase mt-0.5">
-              Taller Automotriz
-            </p>
-          </div>
-        </div>
+        )}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors mx-auto"
+            title={collapsed ? "Expandir menú lateral" : "Colapsar menú lateral"}
+          >
+            <ChevronLeft size={16} className={cn("transition-transform duration-200", collapsed && "rotate-180")} />
+          </button>
+        )}
       </div>
 
-      {/* ── Nav ── */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto no-scrollbar">
-        <p className="px-3 mb-2 text-[9px] font-black tracking-[0.3em] dark:text-white/20 text-slate-900/20 uppercase">
-          Navegación
-        </p>
-        <ul className="space-y-0.5">
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <li key={to}>
-              <NavLink
-                to={to}
-                className={({ isActive }) => cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 relative',
-                  isActive
-                    ? 'bg-gm-red/10 text-white border border-gm-red/20'
-                    : 'text-white/45 hover:text-white/80 hover:bg-white/[0.04] border border-transparent',
-                )}
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-gm-red rounded-r-full shadow-[0_0_8px_rgba(225,20,40,0.8)]" />
-                    )}
-                    <Icon size={16} className={isActive ? 'text-gm-red' : 'text-current'} />
-                    <span className="flex-1">{label}</span>
-                    {isActive && <ChevronRight size={12} className="text-gm-red/50" />}
-                  </>
-                )}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      {/* ── User card + logout ── */}
-      <div className="px-3 pb-4 border-t border-white/[0.05] pt-3 space-y-2">
-        {/* Tarjeta de usuario */}
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-          <div className="w-8 h-8 rounded-full bg-gm-red/15 border border-gm-red/25 flex items-center justify-center shrink-0">
-            <span className="text-gm-red text-xs font-black">{initials(user?.nombre_completo ?? 'U')}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="dark:text-white text-slate-900 text-[12px] font-bold truncate leading-tight">
-              {user?.nombre_completo ?? 'Usuario'}
+      {/* ── Lista de enlaces ── */}
+      <nav className="flex-1 px-3 py-3 overflow-y-auto no-scrollbar space-y-4">
+        {/* Sección Principal */}
+        <div>
+          {!collapsed && (
+            <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Servicios & Gestión
             </p>
-            <p className={`text-[10px] font-bold tracking-[0.1em] uppercase mt-0.5 ${roleColor}`}>
-              {roleLabel}
-            </p>
-          </div>
+          )}
+          <ul className="space-y-1">
+            {mainItems.map(({ to, label, icon: Icon }) => (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  title={collapsed ? label : undefined}
+                  className={({ isActive }) => cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 relative group',
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25 dark:shadow-none'
+                      : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50/70 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50'
+                  )}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon
+                        size={18}
+                        className={cn(
+                          "transition-colors shrink-0",
+                          isActive ? "text-white" : "text-slate-500 group-hover:text-blue-600 dark:text-slate-400 dark:group-hover:text-blue-400"
+                        )}
+                      />
+                      {!collapsed && (
+                        <>
+                          <span className="flex-1 truncate">{label}</span>
+                          {isActive && <ChevronRight size={14} className="text-white/80" />}
+                        </>
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Botón Cerrar sesión — siempre visible */}
+        {/* Sección Más Módulos */}
+        {secondaryItems.length > 0 && (
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60">
+            {!collapsed ? (
+              <button
+                onClick={() => setShowSecondary(!showSecondary)}
+                className="w-full px-3 py-1 mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600"
+              >
+                <span>Módulos de Taller</span>
+                <ChevronDown size={12} className={cn("transition-transform duration-200", !showSecondary && "-rotate-90")} />
+              </button>
+            ) : null}
+
+            {(showSecondary || collapsed) && (
+              <ul className="space-y-1">
+                {secondaryItems.map(({ to, label, icon: Icon }) => (
+                  <li key={to}>
+                    <NavLink
+                      to={to}
+                      title={collapsed ? label : undefined}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-150 relative group',
+                        isActive
+                          ? 'bg-red-600 text-white shadow-sm shadow-red-500/20'
+                          : 'text-slate-600 hover:text-red-600 hover:bg-red-50/60 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/40'
+                      )}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <Icon
+                            size={16}
+                            className={cn(
+                              "transition-colors shrink-0",
+                              isActive ? "text-white" : "text-slate-400 group-hover:text-red-600 dark:text-slate-400 dark:group-hover:text-red-400"
+                            )}
+                          />
+                          {!collapsed && <span className="flex-1 truncate">{label}</span>}
+                        </>
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </nav>
+
+      {/* ── Footer Usuario + Salir ── */}
+      <div className="p-3 border-t border-slate-100 dark:border-slate-800/60 space-y-2 bg-slate-50/50 dark:bg-slate-900/40">
+        {!collapsed ? (
+          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white dark:bg-[#131927] border border-slate-200/80 dark:border-slate-800 shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-200 dark:border-blue-700/40">
+              {initials(user?.nombre_completo ?? 'U')}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-bold text-slate-800 dark:text-white truncate">
+                {user?.nombre_completo ?? 'Usuario'}
+              </p>
+              <span className={cn("inline-block text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border tracking-wider", roleBadgeBg)}>
+                {roleLabel}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="w-8 h-8 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-xs border border-blue-200 dark:border-blue-700/40" title={user?.nombre_completo}>
+            {initials(user?.nombre_completo ?? 'U')}
+          </div>
+        )}
+
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-white/40 hover:text-red-400 hover:bg-red-500/[0.07] border border-transparent hover:border-red-500/[0.15] transition-all duration-150 group"
+          title={collapsed ? "Cerrar sesión" : undefined}
+          className={cn(
+            "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-red-600 hover:bg-red-50 dark:text-slate-400 dark:hover:text-red-400 dark:hover:bg-red-950/30",
+            collapsed && "justify-center px-0"
+          )}
         >
-          <LogOut size={15} className="group-hover:rotate-12 transition-transform duration-200" />
-          Cerrar sesión
+          <LogOut size={16} />
+          {!collapsed && <span>Cerrar sesión</span>}
         </button>
       </div>
     </aside>
