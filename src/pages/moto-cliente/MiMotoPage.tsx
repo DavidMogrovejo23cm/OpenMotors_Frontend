@@ -1,3 +1,4 @@
+import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
    GMotors — Mi Moto (vista cliente)
    Muestra las motos del cliente o formulario para registrar la primera.
@@ -9,7 +10,7 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  Bike, Camera, Plus, User, Phone, CreditCard,
+  Car, Camera, Plus, User, Phone, CreditCard,
   CheckCircle, Pencil, X, Save,
   Gauge, Activity,
 } from 'lucide-react';
@@ -27,7 +28,7 @@ import { EstadoMotoLive } from '../../components/mantenimiento/EstadoMantenimien
 import { calcularEstadoLocal } from '../../lib/mantenimiento';
 
 /* ─── Tipos de moto usados en Ecuador (igual que MotosPage) ─── */
-const TIPOS = ['Calle', 'Deportiva', 'Trabajo', 'Todoterreno', 'Touring', 'Otro'];
+const TIPOS = VEHICLE_TYPES;
 
 const TIPO_COLOR: Record<string, string> = {
   Calle: '#3B82F6', Deportiva: '#FF3B47', Trabajo: '#F59E0B',
@@ -43,7 +44,6 @@ const motoSchema = z.object({
   nombre_moto: z.string().optional(),
   tipo_moto:   z.string().min(1, 'Selecciona el tipo'),
   kilometraje: z.coerce.number().int().nonnegative('Ingresa los kilómetros'),
-  cilindraje:  z.coerce.number().int().positive('Ingresa el cilindraje'),
 });
 type MotoForm = z.infer<typeof motoSchema>;
 
@@ -158,7 +158,7 @@ export default function MiMotoPage() {
     try {
       await motosApi.update(moto.id_moto, { kilometraje: km });
       setMotos(prev => prev.map(m => m.id_moto === moto.id_moto ? { ...m, kilometraje: km } : m));
-      toast.success('Kilometraje actualizado · Recalculando mantenimiento…', 'Mi Moto');
+      toast.success('Kilometraje actualizado · Recalculando mantenimiento…', 'Mis vehículos');
     } catch (err) {
       toast.error(getErrorMsg(err), 'Error');
     } finally {
@@ -192,7 +192,7 @@ export default function MiMotoPage() {
       const base64 = await comprimirImagen(file);
       await motosApi.update(moto.id_moto, { ruta_imagen_motos: base64 });
       setMotos(prev => prev.map(m => m.id_moto === moto.id_moto ? { ...m, ruta_imagen_motos: base64 } : m));
-      toast.success('Foto actualizada', 'Mi Moto');
+      toast.success('Foto actualizada', 'Mis vehículos');
     } catch {
       toast.error('No se pudo guardar la foto.', 'Foto');
     } finally {
@@ -226,7 +226,7 @@ export default function MiMotoPage() {
           await motosApi.update(creada.id_moto, { ruta_imagen_motos: fotoBase64 });
           creada.ruta_imagen_motos = fotoBase64;
         } catch {
-          toast.error('La moto se creó, pero la foto no se guardó.', 'Foto');
+          toast.error('El vehículo se creó, pero la foto no se guardó.', 'Foto');
         }
       }
       setMotos(prev => [...prev, creada]);
@@ -235,7 +235,7 @@ export default function MiMotoPage() {
       setPhotoFile(null);
       setPhotoDataUrl(null);
       setPhotoPreview(null);
-      toast.success('¡Moto registrada correctamente!', 'Mi Moto');
+      toast.success('¡Vehículo registrado correctamente!', 'Mis vehículos');
     } catch (err) {
       toast.error(getErrorMsg(err), 'Error al guardar');
     } finally {
@@ -308,14 +308,14 @@ export default function MiMotoPage() {
             border: '1px solid rgba(225,20,40,0.3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Bike size={20} color="#E11428" />
+            <Car size={20} color="#E11428" />
           </div>
           <div>
             <h1 style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 800, fontSize: 22, margin: 0, letterSpacing: '-0.03em' }}>
-              Mi Moto
+              Mis vehículos
             </h1>
             <p style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.6)', fontSize: 12.5, margin: 0 }}>
-              Gestiona tu motocicleta y datos de perfil
+              Gestiona tu vehículo y datos de perfil
             </p>
           </div>
         </div>
@@ -445,14 +445,13 @@ export default function MiMotoPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
           }}>
-            <Bike size={32} color="rgba(225,20,40,0.5)" />
+            <Car size={32} color="rgba(225,20,40,0.5)" />
           </div>
           <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 700, fontSize: 17, margin: '0 0 6px' }}>
-            Aún no tienes motos registradas
+            Aún no tienes vehículos registrados
           </p>
           <p style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)', fontSize: 13, margin: '0 0 24px', lineHeight: 1.6 }}>
-            Registra tu moto para acceder a historial de mantenimiento,<br/>
-            alertas y puntos de fidelidad.
+            Registra tu vehículo para acceder a su historial de servicio.
           </p>
           <button
             onClick={() => setAddingMoto(true)}
@@ -464,7 +463,7 @@ export default function MiMotoPage() {
               cursor: 'pointer',
             }}
           >
-            <Plus size={15} /> Registrar mi moto
+            <Plus size={15} /> Registrar vehículo
           </button>
         </div>
       ) : (
@@ -478,12 +477,12 @@ export default function MiMotoPage() {
               <div key={moto.id_moto} style={{ ...card, borderLeft: `3px solid ${color}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: 16 }}>
                   <label style={{ position: 'relative', flexShrink: 0, cursor: 'pointer', display: 'block', width: 56, height: 56 }}
-                         title="Cambiar foto de tu moto">
+                         title="Cambiar foto de tu vehículo">
                     {imagenMoto(moto) ? (
                       <img src={imagenMoto(moto)!} alt={`${moto.marca} ${moto.modelo}`} style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', border: `1px solid ${color}30`, display: 'block' }} />
                     ) : (
                       <div style={{ width: 56, height: 56, borderRadius: 12, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Bike size={24} color={color} />
+                        <Car size={24} color={color} />
                       </div>
                     )}
                     <span style={{ position: 'absolute', right: -4, bottom: -4, width: 20, height: 20, borderRadius: '50%', background: savingPhotoId === moto.id_moto ? 'rgba(225,20,40,0.5)' : '#E11428', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #16161E' }}>
@@ -501,7 +500,6 @@ export default function MiMotoPage() {
                     <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)' }}>Placa: <b style={{ color: isDark ? '#EBEBEB' : '#15151B' }}>{moto.placa}</b></span>
                       <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)' }}>Año: <b style={{ color: isDark ? '#EBEBEB' : '#15151B' }}>{moto.anio}</b></span>
-                      <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)' }}>CC: <b style={{ color: isDark ? '#EBEBEB' : '#15151B' }}>{moto.cilindraje}</b></span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
@@ -560,7 +558,7 @@ export default function MiMotoPage() {
                 (e.currentTarget as HTMLElement).style.color = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)';
               }}
             >
-              <Plus size={15} /> Agregar otra moto
+              <Plus size={15} /> Agregar otro vehículo
             </button>
           )}
         </div>
@@ -571,7 +569,7 @@ export default function MiMotoPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Plus size={16} color="#E11428" />
-              <span style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 700, fontSize: 15 }}>Registrar moto</span>
+              <span style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 700, fontSize: 15 }}>Registrar vehículo</span>
             </div>
             <button onClick={handleCancelMoto}
               style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E4E7EC', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.5)' }}>
@@ -599,7 +597,7 @@ export default function MiMotoPage() {
 
             <div>
               <label style={label}>
-                Foto de tu moto <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(opcional)</span>
+                Foto de tu vehículo <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(opcional)</span>
               </label>
               {(() => {
                 const boxStyle = {
@@ -639,8 +637,8 @@ export default function MiMotoPage() {
 
             {/* Fila 1 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
-              <Input label="Marca" type="text" placeholder="Ej. Honda, Yamaha…" error={errMoto.marca?.message} {...regMoto('marca')} />
-              <Input label="Modelo" type="text" placeholder="Ej. CB300R, MT-07…" error={errMoto.modelo?.message} {...regMoto('modelo')} />
+              <Input label="Marca" type="text" placeholder="Ej. Toyota, Chevrolet…" error={errMoto.marca?.message} {...regMoto('marca')} />
+              <Input label="Modelo" type="text" placeholder="Ej. Corolla, Onix…" error={errMoto.modelo?.message} {...regMoto('modelo')} />
             </div>
             {/* Fila 2 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12 }}>
@@ -650,11 +648,10 @@ export default function MiMotoPage() {
             </div>
             {/* Fila 3 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12 }}>
-              <Input label="Cilindraje (cc)" type="number" placeholder="300" error={errMoto.cilindraje?.message} {...regMoto('cilindraje')} />
               <Input label="Kilometraje" type="number" placeholder="0" error={errMoto.kilometraje?.message} {...regMoto('kilometraje')} />
               {/* Tipo de moto */}
               <div>
-                <label style={label}>Tipo de moto</label>
+                <label style={label}>Tipo de vehículo</label>
                 <select
                   {...regMoto('tipo_moto')}
                   style={{
@@ -677,7 +674,7 @@ export default function MiMotoPage() {
               </button>
               <button type="submit" disabled={savingMoto}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#fff', background: savingMoto ? 'rgba(225,20,40,0.4)' : '#E11428', border: 'none', borderRadius: 10, padding: '9px 22px', cursor: savingMoto ? 'not-allowed' : 'pointer' }}>
-                <Save size={14} /> {savingMoto ? (uploadMsg ?? 'Guardando…') : 'Guardar moto'}
+                <Save size={14} /> {savingMoto ? (uploadMsg ?? 'Guardando…') : 'Guardar vehículo'}
               </button>
             </div>
           </form>

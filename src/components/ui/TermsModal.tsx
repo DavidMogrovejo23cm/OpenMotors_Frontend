@@ -14,7 +14,7 @@ export function acceptTerms() {
 
 const PUNTOS = [
   'Gestionamos tus datos de taller conforme a la Ley LOPDP del Ecuador.',
-  'Tus datos (clientes, motos, órdenes) son privados y solo visibles para el personal autorizado.',
+  'Tus datos (clientes, vehículos, órdenes) son privados y solo visibles para el personal autorizado.',
   'La información de facturación se conserva según normativa SRI Ecuador.',
   'Puedes solicitar la eliminación de tu cuenta y datos en cualquier momento.',
   'El servicio se presta bajo los Términos de Uso de Open Motors.',

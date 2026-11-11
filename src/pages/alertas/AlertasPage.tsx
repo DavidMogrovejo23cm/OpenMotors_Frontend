@@ -6,7 +6,7 @@
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback } from 'react';
-import { Bell, CheckCircle, Bike, Search, RefreshCw } from 'lucide-react';
+import { Bell, CheckCircle, Car, Search, RefreshCw } from 'lucide-react';
 import { motosApi, registrosApi, usuariosApi } from '../../lib/api';
 import { usePolling } from '../../hooks/usePolling';
 import type { Moto, RegistroDetalle, Usuario, MotoAlerta } from '../../types';
@@ -144,7 +144,7 @@ export default function AlertasPage() {
             Alertas de <span className="text-gradient-red">Mantenimiento</span>
           </h1>
           <p className="dark:text-white/35 text-slate-900/35 text-sm mt-1">
-            Cambios de aceite · {alertas.length} motos monitoreadas
+            Cambios de aceite · {alertas.length} vehículos monitoreados
           </p>
         </div>
 
@@ -237,7 +237,7 @@ export default function AlertasPage() {
                   className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
                   style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}
                 >
-                  <Bike size={20} style={{ color: cfg.color }} />
+                  <Car size={20} style={{ color: cfg.color }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -253,7 +253,7 @@ export default function AlertasPage() {
                     {a.moto.marca} {a.moto.modelo} {a.moto.anio}
                   </p>
                   <p className="dark:text-white/35 text-slate-900/35 text-xs truncate">
-                    {a.ownerName} · {a.moto.cilindraje} cc
+                    {a.ownerName}
                   </p>
                 </div>
               </div>

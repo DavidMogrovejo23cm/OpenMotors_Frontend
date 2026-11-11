@@ -30,7 +30,7 @@ export default function RecuperarPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0B0B0D',
+      background: '#FFFFFF',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -48,26 +48,26 @@ export default function RecuperarPage() {
           }}>
             <Wrench size={18} color="white" />
           </div>
-          <p style={{ color: '#fff', fontWeight: 900, fontSize: 17, margin: 0 }}>
+          <p style={{ color: '#181b23', fontWeight: 900, fontSize: 17, margin: 0 }}>
             Open <span style={{ color: '#E11428' }}>Motors</span>
           </p>
         </div>
 
         <div style={{
-          background: '#0F0F14',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: '#FFFFFF',
+          border: '1px solid rgba(24,27,35,0.06)',
           borderRadius: 16,
           padding: '36px 32px',
         }}>
           {!sent ? (
             <>
               <h1 style={{
-                color: '#fff', fontWeight: 900, fontSize: 24,
+                color: '#181b23', fontWeight: 900, fontSize: 24,
                 margin: '0 0 8px', letterSpacing: '-0.03em',
               }}>
                 Recuperar contraseña
               </h1>
-              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, margin: '0 0 28px', lineHeight: 1.6 }}>
+              <p style={{ color: 'rgba(24,27,35,0.35)', fontSize: 13, margin: '0 0 28px', lineHeight: 1.6 }}>
                 Ingresa el correo de tu cuenta y te enviaremos un enlace para restablecer tu contraseña.
               </p>
 
@@ -99,7 +99,7 @@ export default function RecuperarPage() {
                   {loading ? (
                     <>
                       <svg style={{ animation: 'spin 0.8s linear infinite' }} width="15" height="15" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.22)" strokeWidth="3" />
+                        <circle cx="12" cy="12" r="10" stroke="rgba(24,27,35,0.22)" strokeWidth="3" />
                         <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
                       </svg>
                       Enviando…
@@ -121,13 +121,13 @@ export default function RecuperarPage() {
               }}>
                 <CheckCircle2 size={26} color="#10B981" />
               </div>
-              <h2 style={{ color: '#fff', fontWeight: 900, fontSize: 20, margin: '0 0 10px', letterSpacing: '-0.02em' }}>
+              <h2 style={{ color: '#181b23', fontWeight: 900, fontSize: 20, margin: '0 0 10px', letterSpacing: '-0.02em' }}>
                 Correo enviado
               </h2>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, margin: '0 0 8px', lineHeight: 1.6 }}>
-                Si el correo <strong style={{ color: 'rgba(255,255,255,0.65)' }}>{getValues('correo')}</strong> está registrado, recibirás un enlace para restablecer tu contraseña.
+              <p style={{ color: 'rgba(24,27,35,0.4)', fontSize: 13, margin: '0 0 8px', lineHeight: 1.6 }}>
+                Si el correo <strong style={{ color: 'rgba(24,27,35,0.65)' }}>{getValues('correo')}</strong> está registrado, recibirás un enlace para restablecer tu contraseña.
               </p>
-              <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 12, margin: '0 0 24px', lineHeight: 1.6 }}>
+              <p style={{ color: 'rgba(24,27,35,0.28)', fontSize: 12, margin: '0 0 24px', lineHeight: 1.6 }}>
                 Revisa también tu carpeta de spam.
               </p>
             </div>
@@ -139,7 +139,7 @@ export default function RecuperarPage() {
               to="/login"
               style={{
                 display: 'flex', alignItems: 'center', gap: 5,
-                color: 'rgba(255,255,255,0.38)', textDecoration: 'none', fontSize: 13, fontWeight: 500,
+                color: 'rgba(24,27,35,0.38)', textDecoration: 'none', fontSize: 13, fontWeight: 500,
               }}
             >
               <ArrowLeft size={13} /> Volver al inicio de sesión
@@ -147,16 +147,16 @@ export default function RecuperarPage() {
           </div>
 
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-            <Shield size={10} color="rgba(255,255,255,0.18)" />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)' }}>
+            <Shield size={10} color="rgba(24,27,35,0.18)" />
+            <span style={{ fontSize: 10, color: 'rgba(24,27,35,0.18)' }}>
               Conexión SSL · Datos protegidos
             </span>
           </div>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.12)', marginTop: 20 }}>
+        <p style={{ textAlign: 'center', fontSize: 10, color: 'rgba(24,27,35,0.12)', marginTop: 20 }}>
           © 2025 Open Motors · Ecuador ·{' '}
-          <Link to="/privacidad" style={{ color: 'rgba(255,255,255,0.2)', textDecoration: 'none' }}>Privacidad</Link>
+          <Link to="/privacidad" style={{ color: 'rgba(24,27,35,0.2)', textDecoration: 'none' }}>Privacidad</Link>
         </p>
       </div>
 

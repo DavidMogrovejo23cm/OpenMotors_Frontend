@@ -48,7 +48,7 @@ export default function MetodologiaPage() {
                 Metodología de mantenimiento
               </h1>
               <p style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.42)', fontSize: 13, margin: 0 }}>
-                Cómo el sistema calcula cuándo cada moto necesita servicio
+                Cómo el sistema calcula cuándo cada vehículo necesita servicio
               </p>
             </div>
           </div>
@@ -75,7 +75,7 @@ export default function MetodologiaPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 18 }}>
           {[
-            { n: 1, t: 'Cilindraje → categoría', d: 'Según los cc de la moto se ubica en una de 5 categorías (50-125 hasta 651+).' },
+            { n: 1, t: 'Cilindraje → categoría', d: 'Según los cc del vehículo se ubica en una de 5 categorías (50-125 hasta 651+).' },
             { n: 2, t: 'Intervalos por categoría', d: 'Cada categoría tiene su propio intervalo en km para cada componente.' },
             { n: 3, t: 'Desgaste actual', d: 'Con el kilometraje actual calculamos qué % de vida útil lleva cada pieza.' },
             { n: 4, t: 'Aviso automático', d: 'Al 80% avisamos; al 100% el componente está vencido y se envía un correo.' },
@@ -114,7 +114,7 @@ export default function MetodologiaPage() {
         {/* Ejemplo real */}
         <div style={{ marginTop: 14, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: 10, padding: '12px 16px' }}>
           <p style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(21,21,27,0.6)', margin: 0, lineHeight: 1.7 }}>
-            <strong style={{ color: '#F59E0B' }}>Ejemplo:</strong> moto de 300 cc con 18 000 km. La bujía se cambia
+            <strong style={{ color: '#F59E0B' }}>Ejemplo:</strong> vehículo de 300 cc con 18 000 km. La bujía se cambia
             cada 10 000 km → último cambio a los 10 000, lleva 8 000 km recorridos →{' '}
             <strong style={{ color: '#F59E0B' }}>80% de desgaste</strong>, faltan 2 000 km para el próximo cambio (a los 20 000 km).
             Por eso aparece en amarillo: <em>no está mal calculado, está avisando con anticipación.</em>

@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 /* ─────────────────────────────────────────────
    GMotors — Dashboard Enterprise v3
    KPIs reales · Recharts · Multi-rol
@@ -5,11 +6,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Wrench, Package, Bike, Users, ArrowRight,
-  TrendingUp, TrendingDown, Clock, Zap, Activity,
-  Bell, Star, AlertTriangle, ChevronRight, Printer,
-} from 'lucide-react';
+import { Wrench, Package, Car, Users, ArrowRight, TrendingUp, TrendingDown, Clock, Zap, Activity, Star, AlertTriangle, ChevronRight, Printer } from 'lucide-react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid,
@@ -17,7 +14,7 @@ import {
 import ContabilidadChart from '../../components/charts/ContabilidadChart';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
-import { motosApi, registrosApi, productosApi, usuariosApi, combustibleApi, pagosEmpleadoApi, facturasApi, type PagoEmpleadoAPI } from '../../lib/api';
+import { motosApi, registrosApi, productosApi, usuariosApi, pagosEmpleadoApi, facturasApi, type PagoEmpleadoAPI } from '../../lib/api';
 import { fmtDate, fmtMoney, parsePermisos } from '../../lib/utils';
 import { usePolling } from '../../hooks/usePolling';
 import { useCountUp } from '../../hooks/useGsap';
@@ -132,7 +129,7 @@ function EstadosPieChart({ data, isDark }: {
 
 /* ── KPI Card animado ── */
 function KpiCard({ icon: Icon, label, target, sub, to, color, trend }: {
-  icon: React.ElementType; label: string; target: number;
+  icon: LucideIcon; label: string; target: number;
   sub: string; to: string; color: string; trend?: number;
 }) {
   const ref = useCountUp<HTMLParagraphElement>(target, 1.6);
@@ -201,7 +198,6 @@ function WebDashboard() {
   const [registros,   setRegistros]   = useState<RegistroDetalle[]>([]);
   const [productos,   setProductos]   = useState<Producto[]>([]);
   const [usuarios,    setUsuarios]    = useState<unknown[]>([]);
-  const [combustible, setCombustible] = useState<{ id_carga:number; fecha:string; costo_total:number }[]>([]);
   const [gastos,      setGastos]      = useState<PagoEmpleadoAPI[]>([]);
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -216,17 +212,15 @@ function WebDashboard() {
       motosApi.list(), 
       registrosApi.list(), 
       productosApi.list(), 
-      combustibleApi.list(),
       isAdmin ? usuariosApi.list() : Promise.resolve({ data: [] }),
       isAdmin ? pagosEmpleadoApi.listAll() : Promise.resolve({ data: [] }),
       isAdmin ? facturasApi.list() : Promise.resolve({ data: [] })
     ];
-    const [m, r, p, c, u, g, f] = await Promise.allSettled(promises);
+    const [m, r, p, u, g, f] = await Promise.allSettled(promises);
     
     if (m.status === 'fulfilled') setMotos(m.value.data);
     if (r.status === 'fulfilled') setRegistros(r.value.data);
     if (p.status === 'fulfilled') setProductos(p.value.data);
-    if (c.status === 'fulfilled') setCombustible(Array.isArray(c.value.data) ? c.value.data : []);
     if (u.status === 'fulfilled') setUsuarios(u.value.data);
     if (g.status === 'fulfilled') setGastos(g.value.data);
     if (f.status === 'fulfilled') setFacturas(f.value.data);
@@ -373,7 +367,7 @@ function WebDashboard() {
         ${kpi('Facturadas', String(facturadas.length), '#14B8A6')}
         ${kpi('Ingresos', fmtMoney(ingresosWeek), '#E11428')}
         ${kpi('Ticket prom.', fmtMoney(ticketProm), '#8B5CF6')}
-        ${kpi('Motos totales', String(nuevasMotos), '#3B82F6')}
+        ${kpi('Vehículos totales', String(nuevasMotos), '#3B82F6')}
       </div>
 
       <h3>Servicios de la semana (${regsWeek.length})</h3>
@@ -419,7 +413,7 @@ function WebDashboard() {
           <p className="text-[11px] dark:text-white/30 text-slate-900/30 font-bold uppercase tracking-widest">{greeting}</p>
           <h1 className="text-3xl font-black dark:text-white text-slate-900 mt-1">{firstName}</h1>
           <div className="flex items-center gap-4 mt-4 flex-wrap">
-            <div className="text-center"><p className="text-2xl font-black dark:text-white text-slate-900">{myMotos.length}</p><p className="text-xs dark:text-white/35 text-slate-900/35">Motos</p></div>
+            <div className="text-center"><p className="text-2xl font-black dark:text-white text-slate-900">{myMotos.length}</p><p className="text-xs dark:text-white/35 text-slate-900/35">Vehículos</p></div>
             <div className="w-px h-8 bg-white/10" />
             <div className="text-center"><p className="text-2xl font-black dark:text-white text-slate-900">{myRegs.length}</p><p className="text-xs dark:text-white/35 text-slate-900/35">Servicios</p></div>
             <div className="w-px h-8 bg-white/10" />
@@ -428,10 +422,8 @@ function WebDashboard() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
-            { label: 'Mis motos',    to: '/mi-moto',     color: '#3B82F6', icon: Bike   },
-            { label: 'Mis puntos',   to: '/puntos',      color: '#F59E0B', icon: Star   },
+            { label: 'Mis vehículos',    to: '/mi-moto',     color: '#3B82F6', icon: Car   },
             { label: 'Mi portal',    to: '/portal',      color: '#10B981', icon: Users  },
-            { label: 'Combustible',  to: '/combustible', color: '#8B5CF6', icon: Zap    },
           ].map(({ label, to, color, icon: Icon }) => (
             <Link key={to} to={to}
                   className="gm-card-d rounded-2xl p-4 flex items-center gap-3 hover:border-gm-red/30 transition-all">
@@ -505,7 +497,7 @@ function WebDashboard() {
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard icon={Bike}    label="Motos registradas" target={motos.length}    sub="vehículos totales"   to="/motos"      color="#3B82F6" />
+        <KpiCard icon={Car}    label="Vehículos registrados" target={motos.length}    sub="vehículos totales"   to="/motos"      color="#3B82F6" />
         <KpiCard icon={Wrench}  label="Órdenes activas"   target={activas}         sub="en proceso/pendiente" to="/registros"  color="#E11428" />
         <KpiCard icon={Package} label="Stock crítico"      target={stockCritico}   sub="productos ≤3 unidades" to="/inventario" color="#F59E0B" />
         {isAdmin && <KpiCard icon={Users} label="Usuarios" target={usuarios.length} sub="cuentas del sistema" to="/perfiles"   color="#8B5CF6" />}
@@ -513,44 +505,21 @@ function WebDashboard() {
 
       {/* ── Panel general de módulos (SOLO admin/mecánico · sin Contabilidad) ── */}
       {(isAdmin || isMecanico) && !loading && (() => {
-        // Comparativa semanal combustible
-        const now = new Date();
-        const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-        const startOfLastWeek = new Date(startOfThisWeek.getTime() - 7 * 24 * 60 * 60 * 1000);
-        
-        const combThisWeek = combustible.filter(c => new Date(c.fecha) >= startOfThisWeek).reduce((s, c) => s + (c.costo_total ?? 0), 0);
-        const combLastWeek = combustible.filter(c => {
-            const d = new Date(c.fecha);
-            return d >= startOfLastWeek && d < startOfThisWeek;
-        }).reduce((s, c) => s + (c.costo_total ?? 0), 0);
-        
-        let combTrend = '—';
-        let combColor = '#8B5CF6';
-        if (combLastWeek > 0) {
-            const diff = ((combThisWeek - combLastWeek) / combLastWeek) * 100;
-            combTrend = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}% vs sem. ant.`;
-            combColor = diff > 0 ? '#F43F5E' : '#10B981'; // Más gasto es rojo, menos es verde
-        } else if (combThisWeek > 0) {
-            combTrend = 'Gasto iniciado';
-        }
-
         const facturados = registros.filter(r => r.estado === 4).length;
         const pct = (n: number, total: number) => total > 0 ? Math.round((n / total) * 100) : 0;
 
         const MODS: {
-          to: string; label: string; icon: React.ElementType;
+          to: string; label: string; icon: LucideIcon;
           color: string; val: number; sub: string; pct?: number;
         }[] = [
           { to:'/registros',   label:'Registros',   icon:Wrench,      color:'#E11428',
             val: registros.length,  sub:`${activas} activos · ${facturados} facturados`,
             pct: pct(facturados, registros.length) },
-          { to:'/motos',       label:'Motos',        icon:Bike,        color:'#3B82F6',
+          { to:'/motos',       label:'Vehículos',        icon:Car,        color:'#3B82F6',
             val: motos.length,      sub:`vehículos registrados`, pct: 100 },
           { to:'/inventario',  label:'Inventario',   icon:Package,     color:'#F59E0B',
             val: productos.length,  sub:`${stockCritico} con stock crítico`,
             pct: productos.length > 0 ? Math.round(((productos.length - stockCritico) / productos.length) * 100) : 100 },
-          { to:'/combustible', label:'Combustible',  icon:Zap,         color: combColor,
-            val: combustible.length, sub:`${combTrend}`, pct: 100 },
           { to:'/clientes',    label:'Clientes',     icon:Users,       color:'#10B981',
             val: usuarios.length,   sub:`usuarios del sistema`, pct: 100 },
           ...(isAdmin ? [
@@ -748,8 +717,7 @@ function WebDashboard() {
             <div className="space-y-1.5">
               {[
                 { label: 'Nueva orden',    icon: Wrench,  to: '/registros',   desc: 'Crear servicio'   },
-                { label: 'Registrar moto', icon: Bike,    to: '/motos',       desc: 'Nuevo vehículo'   },
-                { label: 'Ver alertas',    icon: Bell,    to: '/alertas',     desc: 'Mantenimientos'   },
+                { label: 'Registrar vehículo', icon: Car,    to: '/motos',       desc: 'Nuevo vehículo'   },
                 ...(isAdmin ? [
                   { label: 'Pagos',         icon: Activity, to: '/pagos',     desc: 'Cobros y facturas' },
                   { label: 'Perfiles',      icon: Users,    to: '/perfiles',  desc: 'Equipo' },

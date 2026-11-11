@@ -32,8 +32,6 @@ import ClientesPage        from './pages/clientes/ClientesPage';
 
 /* Nuevos módulos */
 import AlertasPage       from './pages/alertas/AlertasPage';
-import PuntosPage        from './pages/puntos/PuntosPage';
-import CombustiblePage   from './pages/combustible/CombustiblePage';
 import InvoicePage       from './pages/invoice/InvoicePage';
 import PortalClientePage from './pages/portal/PortalClientePage';
 import MiMotoPage        from './pages/moto-cliente/MiMotoPage';
@@ -41,9 +39,7 @@ import DiagnosticoPage   from './pages/diagnostico/DiagnosticoPage';
 import PagosPage         from './pages/pagos/PagosPage';
 import ContabilidadPage  from './pages/contabilidad/ContabilidadPage';
 import ProveedoresPage   from './pages/proveedores/ProveedoresPage';
-import MetodologiaPage   from './pages/metodologia/MetodologiaPage';
 import AjustesPage       from './pages/settings/AjustesPage';
-import IntervalosMantenimientoPage from './pages/settings/IntervalosMantenimientoPage';
 
 /* ─── Guarda de roles ─────────────────────────────────────────────────────────
    Redirige a /dashboard si el usuario no tiene ninguno de los roles indicados.
@@ -92,8 +88,6 @@ export default function App() {
 
                 {/* Accesibles para TODOS los roles autenticados */}
                 <Route path="/dashboard"   element={<DashboardPage />}    />
-                <Route path="/puntos"      element={<PuntosPage />}        />
-                <Route path="/combustible" element={<CombustiblePage />}   />
                 <Route path="/invoice/:id" element={<InvoicePage />}       />
                 <Route path="/portal"      element={<PortalClientePage />} />
                 <Route path="/mi-moto"    element={<MiMotoPage />}        />
@@ -125,10 +119,6 @@ export default function App() {
                   <Route element={<RequireModule modulo="clientes" />}>
                     <Route path="/clientes"     element={<ClientesPage />}     />
                   </Route>
-                  <Route element={<RequireModule modulo="metodologia" />}>
-                    <Route path="/metodologia" element={<MetodologiaPage />}  />
-                  </Route>
-                  <Route path="/ajustes/intervalos" element={<IntervalosMantenimientoPage />} />
                 </Route>
 
                 {/* ADMIN + MECÁNICO: contabilidad (mecánico ve solo sus datos) */}

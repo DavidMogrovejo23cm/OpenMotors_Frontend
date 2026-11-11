@@ -10,9 +10,9 @@ export default defineConfig({
     port: 4200,
     open: true,
     proxy: {
-      /* Redirige /api al backend Spring Boot en desarrollo */
+      /* Redirige /api al backend FastAPI en desarrollo */
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
     },
@@ -39,3 +39,4 @@ export default defineConfig({
     },
   },
 });
+

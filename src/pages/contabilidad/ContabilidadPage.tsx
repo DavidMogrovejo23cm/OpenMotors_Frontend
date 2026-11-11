@@ -515,7 +515,7 @@ function exportarExcel(
     XLSX.utils.book_append_sheet(wb, buildReportSheet(pendientes, [], empleados, label, detallesMap, productos, 'pendientes', proveedores), 'Pendientes');
   }
   if (activas.length > 0) {
-    XLSX.utils.book_append_sheet(wb, buildReportSheet(activas, [], empleados, label, detallesMap, productos, 'activas', proveedores), 'Motos Activas');
+    XLSX.utils.book_append_sheet(wb, buildReportSheet(activas, [], empleados, label, detallesMap, productos, 'activas', proveedores), 'Vehículos activos');
   }
 
   if (filtroTipo === 'anio') {

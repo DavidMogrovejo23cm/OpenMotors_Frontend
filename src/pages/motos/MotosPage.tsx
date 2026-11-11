@@ -1,13 +1,11 @@
+import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
    Open Motors — Motos Page  (Redesign Premium)
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  Plus, Search, Pencil, Trash2, Bike, Gauge, User,
-  Calendar, Zap, Shield, SlidersHorizontal, ClipboardList, ImageIcon, BookOpen,
-} from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Car, Gauge, User, Calendar, Zap, Shield, SlidersHorizontal, ClipboardList, ImageIcon } from 'lucide-react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,13 +21,10 @@ import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 
 /* Tipos de moto usados en Ecuador (talleres) — sin Scooter/Cruiser/Scrambler */
-const TIPOS = ['Calle', 'Deportiva', 'Trabajo', 'Todoterreno', 'Touring', 'Otro'];
+const TIPOS = VEHICLE_TYPES;
 
 /* Marcas comunes en Ecuador (datalist, no restringe texto libre) */
-const MARCAS_EC = [
-  'Honda', 'Yamaha', 'Suzuki', 'Bajaj', 'TVS', 'Shineray', 'Daytona',
-  'Motor Uno', 'Ranger', 'Hero', 'AKT', 'Sukida', 'Loncin', 'Galardi', 'KTM',
-];
+const MARCAS_EC = ['Chevrolet', 'Toyota', 'Kia', 'Hyundai', 'Suzuki', 'Nissan', 'Ford', 'Renault', 'Mazda', 'Volkswagen', 'Honda'];
 
 /* Color accent por tipo */
 const TIPO_CONFIG: Record<string, { color: string; bg: string; dot: string }> = {
@@ -43,15 +38,6 @@ const TIPO_CONFIG: Record<string, { color: string; bg: string; dot: string }> = 
 const getTipoConfig = (tipo: string) =>
   TIPO_CONFIG[tipo] ?? TIPO_CONFIG['Otro'];
 
-const CC_RANGES = [
-  { max: 125,  label: 'Urbana',           color: '#10B981' },
-  { max: 200,  label: 'Semideportiva',    color: '#3B82F6' },
-  { max: 400,  label: 'Deportiva',        color: '#F59E0B' },
-  { max: 650,  label: 'Alto rendimiento', color: '#FF8C00' },
-  { max: Infinity, label: 'Supersport',   color: '#E11428' },
-];
-const getCCRange = (cc: number) => CC_RANGES.find(r => cc <= r.max) ?? CC_RANGES[CC_RANGES.length - 1];
-
 const schema = z.object({
   placa:              z.string().min(6, 'Mínimo 6 caracteres').transform((v) => v.toUpperCase()),
   anio:               z.coerce.number().int().min(1980).max(new Date().getFullYear() + 1),
@@ -60,7 +46,6 @@ const schema = z.object({
   nombre_moto:        z.string().optional(),
   tipo_moto:          z.string().min(1, 'Selecciona el tipo'),
   kilometraje:        z.coerce.number().int().nonnegative(),
-  cilindraje:         z.coerce.number().int().positive(),
   id_usuario:         z.coerce.number().positive('Selecciona un propietario'),
   /* La foto NO va en el formulario: se maneja aparte (imageFile) para no
      arrastrar valores viejos/vacíos al PUT y dañar otras motos. */
@@ -189,8 +174,8 @@ function MotoCard({
             <Gauge size={13} style={{ color: tc.color }} />
           </div>
           <div>
-            <p className="moto-stat-val">{moto.cilindraje}</p>
-            <p className="moto-stat-lbl">CC</p>
+            <p className="moto-stat-val">{moto.modelo}</p>
+            <p className="moto-stat-lbl">Modelo</p>
           </div>
         </div>
 
@@ -218,22 +203,6 @@ function MotoCard({
           </div>
         </div>
       </div>
-
-      {/* CC range badge */}
-      {(() => {
-        const range = getCCRange(moto.cilindraje);
-        return (
-          <div style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{
-              fontSize: 9.5, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase',
-              color: range.color, background: `${range.color}15`,
-              border: `1px solid ${range.color}30`, borderRadius: 99, padding: '2px 8px',
-            }}>
-              {moto.cilindraje} cc — {range.label}
-            </span>
-          </div>
-        );
-      })()}
 
       {/* Footer owner + diagnostic */}
       <div className="moto-card-footer">
@@ -274,7 +243,6 @@ export default function MotosPage() {
   const [saving,       setSaving]       = useState(false);
   const [search,       setSearch]       = useState('');
   const [filterTipo,   setFilterTipo]   = useState('');
-  const [filterCC,     setFilterCC]     = useState('');
   const [modalOpen,    setModalOpen]    = useState(false);
   const [editTarget,   setEditTarget]   = useState<Moto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Moto | null>(null);
@@ -331,7 +299,7 @@ export default function MotosPage() {
     reset({
       placa: m.placa, anio: m.anio, marca: m.marca, modelo: m.modelo,
       nombre_moto: m.nombre_moto ?? '', tipo_moto: m.tipo_moto,
-      kilometraje: m.kilometraje, cilindraje: m.cilindraje, id_usuario: m.id_usuario,
+      kilometraje: m.kilometraje, id_usuario: m.id_usuario,
     });
     setModalOpen(true);
   };
@@ -355,15 +323,15 @@ export default function MotosPage() {
           try { await motosApi.update(motoIdEditada, { ruta_imagen_motos: fotoBase64 }); }
           catch { toast.error('Datos guardados, pero la foto no (actualiza el backend a columna TEXT).'); }
         }
-        toast.success('Moto actualizada');
+        toast.success('Vehículo actualizado');
       } else {
         const { data: nueva } = await motosApi.create(data);
         const creada = nueva as Moto;
         if (fotoBase64 && creada?.id_moto) {
           try { await motosApi.update(creada.id_moto, { ruta_imagen_motos: fotoBase64 }); }
-          catch { toast.error('Moto creada, pero la foto no se guardó (actualiza el backend a columna TEXT).'); }
+          catch { toast.error('Vehículo creado, pero la foto no se guardó (actualiza el backend a columna TEXT).'); }
         }
-        toast.success('Moto registrada');
+        toast.success('Vehículo registrado');
       }
       setModalOpen(false);
       setImageFile(null); setImagePreview(null);
@@ -376,7 +344,7 @@ export default function MotosPage() {
     if (!deleteTarget) return;
     try {
       await motosApi.remove(deleteTarget.id_moto);
-      toast.success('Moto eliminada');
+      toast.success('Vehículo eliminado');
       setDeleteTarget(null);
       fetchData();
     } catch (err) { toast.error(getErrorMsg(err)); }
@@ -392,11 +360,9 @@ export default function MotosPage() {
       m.placa.toLowerCase().includes(q) ||
       m.marca.toLowerCase().includes(q) ||
       m.modelo.toLowerCase().includes(q) ||
-      owner.includes(q) ||
-      String(m.cilindraje).includes(q);
+      owner.includes(q);
     const matchTipo = filterTipo === '' || m.tipo_moto === filterTipo;
-    const matchCC   = filterCC === '' || getCCRange(m.cilindraje).label === filterCC;
-    return matchQ && matchTipo && matchCC;
+    return matchQ && matchTipo;
   });
 
   /* Stats summary */
@@ -413,27 +379,18 @@ export default function MotosPage() {
             <Shield size={10} className="mp-bc-icon" />
             <span>{canManage ? 'Inventario' : 'Mi cuenta'}</span>
             <span className="mp-bc-sep">›</span>
-            <span className="mp-bc-active">{canManage ? 'Vehículos' : 'Mis motos'}</span>
+            <span className="mp-bc-active">{canManage ? 'Vehículos' : 'Mis vehículos'}</span>
           </div>
           <h1 className="mp-title">
             {canManage
-              ? <>Flota de <span className="mp-title-accent">Motos</span></>
-              : <>Mis <span className="mp-title-accent">Motos</span></>
+              ? <>Flota de <span className="mp-title-accent">Vehículos</span></>
+              : <>Mis <span className="mp-title-accent">Vehículos</span></>
             }
           </h1>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-3 sm:mt-0">
-          {canManage && (
-            <Link
-              to="/metodologia"
-              title="Cómo calculamos el mantenimiento"
-              className="flex items-center justify-center gap-1.5 text-xs font-bold text-blue-500 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2 hover:bg-blue-500/20 transition-colors"
-            >
-              <BookOpen size={14} /> <span className="sm:inline">Metodología</span>
-            </Link>
-          )}
           <Button icon={<Plus size={14} />} onClick={openCreate}>
-            {canManage ? 'Nueva moto' : 'Agregar moto'}
+            {canManage ? 'Nuevo vehículo' : 'Agregar vehículo'}
           </Button>
         </div>
       </div>
@@ -442,7 +399,7 @@ export default function MotosPage() {
       <div className="mp-kpi-strip mp-header-el">
         <div className="mp-kpi">
           <span className="mp-kpi-num">{motos.length}</span>
-          <span className="mp-kpi-lbl">Motos totales</span>
+          <span className="mp-kpi-lbl">Vehículos totales</span>
         </div>
         <div className="mp-kpi-sep" />
         <div className="mp-kpi">
@@ -496,31 +453,6 @@ export default function MotosPage() {
         </div>
       </div>
 
-      {/* ─── Filtro por cilindraje (categoría) ─── */}
-      <div className="mp-filters mp-header-el" style={{ marginTop: -8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginRight: 4 }}>
-          Cilindraje:
-        </span>
-        <button
-          className={`filter-chip ${filterCC === '' ? 'active' : ''}`}
-          onClick={() => setFilterCC('')}
-        >
-          Todos
-        </button>
-        {CC_RANGES.map((r) => (
-          <button
-            key={r.label}
-            className={`filter-chip ${filterCC === r.label ? 'active' : ''}`}
-            onClick={() => setFilterCC(filterCC === r.label ? '' : r.label)}
-            style={filterCC === r.label ? { '--chip-color': r.color } as React.CSSProperties : {}}
-          >
-            {r.label} <span style={{ opacity: 0.55, fontSize: '0.85em' }}>
-              {r.max === Infinity ? '651+' : `≤${r.max}`}
-            </span>
-          </button>
-        ))}
-      </div>
-
       {/* ─── Grid ─── */}
       <div className="mp-grid">
         {loading
@@ -529,15 +461,15 @@ export default function MotosPage() {
             ? (
               <div className="mp-empty">
                 <div className="mp-empty-icon">
-                  <Bike size={32} />
+                  <Car size={32} />
                 </div>
-                <p className="mp-empty-title">Sin motos registradas</p>
+                <p className="mp-empty-title">Sin vehículos registrados</p>
                 <p className="mp-empty-sub">
-                  {search || filterTipo ? 'Intenta con otro filtro' : 'Agrega la primera moto de la flota'}
+                  {search || filterTipo ? 'Intenta con otro filtro' : 'Agrega el primer vehículo de la flota'}
                 </p>
                 {!search && !filterTipo && (
                   <button onClick={openCreate} className="mp-empty-cta">
-                    <Plus size={14} /> Registrar primera moto
+                    <Plus size={14} /> Registrar primer vehículo
                   </button>
                 )}
               </div>
@@ -560,7 +492,7 @@ export default function MotosPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editTarget ? 'Editar moto' : 'Registrar nueva moto'}
+        title={editTarget ? 'Editar vehículo' : 'Registrar nuevo vehículo'}
         size="lg"
         footer={
           <>
@@ -572,7 +504,7 @@ export default function MotosPage() {
             )}
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button form="moto-form" type="submit" loading={saving}>
-              {editTarget ? 'Guardar cambios' : 'Registrar moto'}
+              {editTarget ? 'Guardar cambios' : 'Registrar vehículo'}
             </Button>
           </>
         }
@@ -611,17 +543,17 @@ export default function MotosPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label="Marca" placeholder="Honda" list="marcas-ec" error={errors.marca?.message} {...register('marca')} />
-            <Input label="Modelo" placeholder="CB190R" error={errors.modelo?.message} {...register('modelo')} />
+            <Input label="Modelo" placeholder="Corolla" error={errors.modelo?.message} {...register('modelo')} />
           </div>
           <datalist id="marcas-ec">
             {MARCAS_EC.map((m) => <option key={m} value={m} />)}
           </datalist>
-          <Input label='Nombre moto (opcional)' placeholder='"La Bestia"' {...register('nombre_moto')} />
+          <Input label='Nombre del vehículo (opcional)' placeholder='"La Bestia"' {...register('nombre_moto')} />
 
           {/* Foto de la moto */}
           <div>
             <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">
-              Foto de la moto <span className="dark:text-white/25 text-slate-900/25 text-xs font-normal">(opcional)</span>
+              Foto del vehículo <span className="dark:text-white/25 text-slate-900/25 text-xs font-normal">(opcional)</span>
             </label>
             <div
               role="button"
@@ -673,14 +605,13 @@ export default function MotosPage() {
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">Tipo de moto</label>
+              <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">Tipo de vehículo</label>
               <select className="gm-input-d" {...register('tipo_moto')}>
                 <option value="">Seleccionar</option>
-                {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
+                {(editTarget && !TIPOS.includes(editTarget.tipo_moto) ? [...TIPOS, editTarget.tipo_moto] : TIPOS).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
               {errors.tipo_moto && <p className="text-xs text-gm-red mt-1">{errors.tipo_moto.message}</p>}
             </div>
-            <Input label="Cilindraje (cc)" type="number" placeholder="650" error={errors.cilindraje?.message} {...register('cilindraje')} />
             <Input label="Kilometraje" type="number" placeholder="0" error={errors.kilometraje?.message} {...register('kilometraje')} />
           </div>
           <div>
@@ -725,7 +656,7 @@ export default function MotosPage() {
       <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Eliminar moto"
+        title="Eliminar vehículo"
         size="sm"
         footer={
           <>
@@ -735,7 +666,7 @@ export default function MotosPage() {
         }
       >
         <p className="text-sm dark:text-white/60 text-slate-900/60">
-          ¿Eliminar la moto{' '}
+          ¿Eliminar el vehículo{' '}
           <span className="plate-tag">{deleteTarget?.placa}</span>
           {' '}·{' '}<strong className="dark:text-white/85 text-slate-900/85">{deleteTarget?.marca} {deleteTarget?.modelo}</strong>?
           <br />

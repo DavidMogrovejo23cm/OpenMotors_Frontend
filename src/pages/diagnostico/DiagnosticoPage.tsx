@@ -6,7 +6,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  ClipboardList, Search, Bike, CheckCircle, AlertTriangle, XCircle,
+  ClipboardList, Search, Car, CheckCircle, AlertTriangle, XCircle,
   ChevronDown, ChevronUp, Gauge, Save, Clock, User,
   Cog, Link2, Shield, Circle, ArrowUpDown, Droplets, Zap, type LucideIcon,
 } from 'lucide-react';
@@ -26,7 +26,7 @@ const PARTES: { key: string; label: string; Icon: LucideIcon }[] = [
   { key: 'LLANTAS',       label: 'Llantas',              Icon: Circle     },
   { key: 'SUSPENSION',    label: 'Suspensión',           Icon: ArrowUpDown},
   { key: 'ELECTRICO',     label: 'Sistema Eléctrico',    Icon: Zap        },
-  { key: 'CARROCERIA',    label: 'Carrocería',           Icon: Bike       },
+  { key: 'CARROCERIA',    label: 'Carrocería',           Icon: Car       },
   { key: 'REFRIGERACION', label: 'Refrigeración',        Icon: Droplets   },
 ];
 
@@ -60,11 +60,11 @@ function DiagnosticoCard({ d, motos, usuarios }: { d: DiagnosticoMoto; motos: Mo
         onClick={() => setOpen(o => !o)}
       >
         <div style={{ width: 42, height: 42, borderRadius: 10, background: ec.bg, border: `1px solid ${ec.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Bike size={18} color={ec.color} />
+          <Car size={18} color={ec.color} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 700, fontSize: 14, margin: 0 }}>
-            {moto ? `${moto.marca} ${moto.modelo}` : `Moto #${d.id_moto}`}
+            {moto ? `${moto.marca} ${moto.modelo}` : `Vehículo #${d.id_moto}`}
             <span style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(21,21,27,0.42)', fontSize: 12, fontWeight: 500, marginLeft: 8 }}>
               {moto?.placa}
             </span>
@@ -104,7 +104,7 @@ function DiagnosticoCard({ d, motos, usuarios }: { d: DiagnosticoMoto; motos: Mo
               />
               <div>
                 <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 800, fontSize: 14, margin: 0 }}>{moto.marca} {moto.modelo}</p>
-                <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.5)', fontSize: 11, margin: '2px 0 0' }}>{moto.placa} · {moto.cilindraje} cc · {moto.anio}</p>
+                <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.5)', fontSize: 11, margin: '2px 0 0' }}>{moto.placa} · {moto.anio}</p>
                 {d.kilometraje_ingreso && (
                   <p style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(21,21,27,0.4)', fontSize: 11, margin: '2px 0 0' }}>
                     Ingresó con {d.kilometraje_ingreso.toLocaleString('es-EC')} km
@@ -282,7 +282,7 @@ export default function DiagnosticoPage() {
           </div>
           <div>
             <h1 style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 800, fontSize: 22, margin: 0, letterSpacing: '-0.03em' }}>
-              Diagnóstico de Moto
+              Diagnóstico de Vehículo
             </h1>
             <p style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.6)', fontSize: 12.5, margin: 0 }}>
               Registro clínico al ingreso — historial de cada vehículo
@@ -354,13 +354,13 @@ export default function DiagnosticoPage() {
         {/* Búsqueda de moto */}
         {!motoSel ? (
           <div style={{ marginBottom: 16 }}>
-            <label style={lbl}>Buscar moto (placa, marca o modelo)</label>
+            <label style={lbl}>Buscar vehículo (placa, marca o modelo)</label>
             <div style={{ position: 'relative' }}>
               <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.35)' }} />
               <input
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
-                placeholder="Ej. ABC-1234, Honda, CB300R…"
+                placeholder="Ej. ABC-1234, Toyota, Corolla…"
                 style={{ width: '100%', paddingLeft: 36, paddingRight: 12, height: 42, borderRadius: 10, background: isDark ? '#1A1A22' : '#FFFFFF', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #D1D5DB', color: isDark ? '#EBEBEB' : '#15151B', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
@@ -380,13 +380,13 @@ export default function DiagnosticoPage() {
                         <img src={m.ruta_imagen_motos} alt={m.placa} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                       ) : (
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Bike size={16} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.3)'} />
+                          <Car size={16} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.3)'} />
                         </div>
                       )}
                       <div style={{ flex: 1 }}>
                         <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontSize: 13, fontWeight: 700, margin: 0 }}>{m.marca} {m.modelo}</p>
                         <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.5)', fontSize: 11, margin: 0 }}>
-                          {m.placa} · {m.cilindraje}cc · {m.kilometraje.toLocaleString()} km
+                          {m.placa} · {m.kilometraje.toLocaleString()} km
                           {owner ? ` · ${owner.nombre_completo}` : ''}
                         </p>
                       </div>
@@ -403,13 +403,13 @@ export default function DiagnosticoPage() {
               <img src={motoSel.ruta_imagen_motos} alt={motoSel.placa} style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
             ) : (
               <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Bike size={22} color="#3B82F6" />
+                <Car size={22} color="#3B82F6" />
               </div>
             )}
             <div style={{ flex: 1 }}>
               <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontSize: 14, fontWeight: 800, margin: 0 }}>{motoSel.marca} {motoSel.modelo}</p>
               <p style={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(21,21,27,0.5)', fontSize: 12, margin: 0 }}>
-                {motoSel.placa} · {motoSel.cilindraje}cc · {motoSel.tipo_moto}
+                {motoSel.placa} · {motoSel.tipo_moto}
               </p>
             </div>
             <button onClick={() => setMotoSel(null)}

@@ -1,10 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard, Wrench, Package, Users,
-  Car, LogOut, ChevronRight, UserCheck, ClipboardList,
-  CreditCard, Truck, Fuel, Bell, Award, BookOpen,
-  DollarSign, ChevronLeft, ChevronDown
-} from 'lucide-react';
+import { LayoutDashboard, Wrench, Package, Users, Car, LogOut, ChevronRight, UserCheck, ClipboardList, CreditCard, Truck, DollarSign, ChevronLeft, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth, type RoleName } from '../../contexts/AuthContext';
 import { initials, cn } from '../../lib/utils';
@@ -28,10 +23,6 @@ const PRINCIPAL_NAV: NavItem[] = [
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { to: '/alertas',      label: 'Alertas',      icon: Bell,        roles: ['ADMIN','MECANICO'] },
-  { to: '/combustible',  label: 'Combustible',  icon: Fuel                                     },
-  { to: '/puntos',       label: 'Puntos Bonus', icon: Award                                    },
-  { to: '/metodologia',  label: 'Metodología',  icon: BookOpen,    roles: ['ADMIN','MECANICO'] },
   { to: '/contabilidad', label: 'Contabilidad', icon: DollarSign,  roles: ['ADMIN','MECANICO'] },
   { to: '/pagos',        label: 'Pagos',        icon: CreditCard,  roles: ['ADMIN']            },
   { to: '/perfiles',     label: 'Perfiles',     icon: Users,       roles: ['ADMIN']            },

@@ -42,8 +42,9 @@ const PERMISSION_REFRESH_MS = 60_000;
 
 /* Extrae token + usuario de cualquier estructura de respuesta del backend */
 function extractAuth(data: Record<string, unknown>) {
-  const token = (data.token ?? data.jwt ?? data.accessToken) as string | undefined;
-  const user  = (data.usuario ?? data.user ?? (data.id ? data : undefined)) as Usuario | undefined;
+  const { token: backendToken, jwt, accessToken, usuario, user: nestedUser, ...profile } = data;
+  const token = (backendToken ?? jwt ?? accessToken) as string | undefined;
+  const user = (usuario ?? nestedUser ?? (profile.id_usuario ?? profile.id ? profile : undefined)) as Usuario | undefined;
   return { token, user };
 }
 

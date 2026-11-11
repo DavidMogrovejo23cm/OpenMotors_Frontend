@@ -1,7 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  Home, Wrench, Bike, Package, LayoutGrid, Zap, Star, type LucideIcon,
-} from 'lucide-react';
+import { Home, Wrench, Car, Package, LayoutGrid, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
 import { canAccessModulo } from '../../lib/utils';
@@ -27,7 +25,7 @@ export default function MobileTabBar({ onMore }: { onMore: () => void }) {
       ? [{ label: 'Ordenes', icon: Wrench, to: '/registros' } as Tab]
       : []),
     ...(canAccessModulo(user?.descripcion, 'motos', isAdmin, isMecanico)
-      ? [{ label: 'Motos', icon: Bike, to: '/motos' } as Tab]
+      ? [{ label: 'Vehículos', icon: Car, to: '/motos' } as Tab]
       : []),
     ...(canAccessModulo(user?.descripcion, 'inventario', isAdmin, isMecanico)
       ? [{ label: 'Inventario', icon: Package, to: '/inventario' } as Tab]
@@ -38,9 +36,7 @@ export default function MobileTabBar({ onMore }: { onMore: () => void }) {
   const tabs: Tab[] = esClientePuro
     ? [
         { label: 'Inicio', icon: Home, to: '/dashboard' },
-        { label: 'Mi Moto', icon: Bike, to: '/mi-moto' },
-        { label: 'Combustible', icon: Zap, to: '/combustible' },
-        { label: 'Puntos', icon: Star, to: '/puntos' },
+        { label: 'Mis vehículos', icon: Car, to: '/mi-moto' },
         { label: 'Mas', icon: LayoutGrid, more: true },
       ]
     : tabsInternos.slice(0, 5);

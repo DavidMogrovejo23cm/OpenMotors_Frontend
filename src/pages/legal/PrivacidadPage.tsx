@@ -10,7 +10,7 @@ const SECTIONS = [
 • Número de cédula de identidad (RUC para empresas)
 • Número de teléfono de contacto
 • Nombre y dirección de tu taller
-• Información sobre vehículos (placa, marca, modelo, año, cilindraje)
+• Información sobre vehículos (placa, marca, modelo, año)
 • Historial de órdenes de servicio y facturación
 • Datos de uso de la plataforma (accesos, acciones realizadas)`,
   },

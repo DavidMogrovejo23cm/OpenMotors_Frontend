@@ -5,10 +5,7 @@
    ───────────────────────────────────────────── */
 import { useEffect, useState, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Wrench, Package, Bike, Users, Activity, Star, Zap,
-  AlertTriangle, ChevronRight, TrendingUp, DollarSign,
-} from 'lucide-react';
+import { Wrench, Package, Car, Users, Activity, AlertTriangle, ChevronRight, TrendingUp, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
 import { motosApi, registrosApi, productosApi, usuariosApi, facturasApi } from '../../lib/api';
@@ -24,7 +21,7 @@ const ESTADO_LABELS = ['Pendiente', 'En proceso', 'Completado', 'Entregado', 'Fa
 
 /* Tarjeta KPI premium */
 function Kpi({ icon: Icon, value, label, color, to }: {
-  icon: typeof Bike; value: string | number; label: string; color: string; to: string;
+  icon: typeof Car; value: string | number; label: string; color: string; to: string;
 }) {
   return (
     <Link to={to} className="m-kpi" style={{ '--c': color } as React.CSSProperties}>
@@ -176,7 +173,7 @@ export default function MobileDashboard() {
           <div className="grid grid-cols-3 gap-2 mt-4 bg-white/5 rounded-xl p-3 border border-white/10 dark:bg-black/10">
             <div className="flex flex-col items-center justify-center">
               <p className="m-hs-num">{myMotos.length}</p>
-              <p className="m-hs-lbl">Motos</p>
+              <p className="m-hs-lbl">Vehículos</p>
             </div>
             <div className="flex flex-col items-center justify-center border-x border-white/10">
               <p className="m-hs-num">{myRegs.length}</p>
@@ -192,9 +189,7 @@ export default function MobileDashboard() {
         <div className="m-section-t mt-4">Accesos Rápidos</div>
         <div className="m-mods">
           {[
-            { label: 'Mi Moto',     desc: 'Estado y mantenimiento', to: '/mi-moto',     color: '#3B82F6', icon: Bike  },
-            { label: 'Combustible', desc: 'Cargas y rendimiento',   to: '/combustible', color: '#8B5CF6', icon: Zap   },
-            { label: 'Mis Puntos',  desc: 'Recompensas',            to: '/puntos',      color: '#F59E0B', icon: Star  },
+            { label: 'Mis vehículos',     desc: 'Estado y mantenimiento', to: '/mi-moto',     color: '#3B82F6', icon: Car  },
           ].map(({ label, desc, to, color, icon: Icon }) => (
             <Link key={to} to={to} className="m-mod gm-card-d hover:-translate-y-1 transition-transform">
               <div className="m-mod-ico" style={{ background: `${color}1c`, border: `1px solid ${color}33` }}>
@@ -244,7 +239,7 @@ export default function MobileDashboard() {
 
       {/* KPIs */}
       <div className="m-kpi-grid">
-        <Kpi icon={Bike}    value={motos.length}  label="Motos"          color="#3B82F6" to="/motos" />
+        <Kpi icon={Car}    value={motos.length}  label="Vehículos"          color="#3B82F6" to="/motos" />
         <Kpi icon={Wrench}  value={activas}        label="Órdenes activas" color="#E11428" to="/registros" />
         <Kpi icon={Package} value={stockCritico}  label="Stock crítico"  color="#F59E0B" to="/inventario" />
         {isAdmin

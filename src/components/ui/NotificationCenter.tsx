@@ -224,13 +224,6 @@ export function NotificationPanel({
       <div className="notif-footer px-4 py-2.5 flex justify-between items-center sticky bottom-0"
            style={{ background: footerBg, borderTop: `1px solid ${headerBorder}` }}>
         <span className="text-[11px]" style={{ color: textMuted }}>{notifications.length} alertas</span>
-        <Link
-          to="/alertas"
-          onClick={onClose}
-          className="text-[11px] text-gm-red font-bold hover:text-gm-red-lt transition-colors flex items-center gap-1"
-        >
-          Ver alertas <ChevronRight size={10} />
-        </Link>
       </div>
     </div>
   );

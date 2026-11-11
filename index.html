@@ -1,23 +1,11 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Open Motors — Taller Especializado en Servicio Automotriz" />
     <title>Open Motors · Sistema de Gestión Automotriz</title>
-    <!-- Tema (claro por defecto de Open Motor) aplicado ANTES de renderizar -->
-    <script>
-      (function () {
-        try {
-          var t = localStorage.getItem('gm_theme') || 'light';
-          document.documentElement.setAttribute('data-theme', t);
-          if (t === 'dark') document.documentElement.classList.add('dark');
-        } catch (e) {
-          document.documentElement.setAttribute('data-theme', 'light');
-        }
-      })();
-    </script>
     <!-- Detector de errores de arranque (script clásico: corre aunque el módulo falle al parsear) -->
     <script>
       (function () {

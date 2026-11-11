@@ -5,7 +5,7 @@ import { WORKSHOP_CONTACT } from '../../lib/constants';
 const SECTIONS = [
   {
     title: '1. Descripción del servicio',
-    body: `Open Motors es una plataforma de software como servicio (SaaS) diseñada para la gestión integral de talleres de motocicletas en Ecuador. El servicio incluye:
+    body: `Open Motors es una plataforma de software como servicio (SaaS) diseñada para la gestión integral de talleres automotrices en Ecuador. El servicio incluye:
 • Módulo de órdenes de trabajo y seguimiento de servicios
 • Gestión de inventario y control de repuestos
 • Registro de clientes y vehículos

@@ -6,16 +6,13 @@
    ───────────────────────────────────────────── */
 
 import { useState, useMemo, useEffect } from 'react';
-import {
-  Droplet, Wind, Zap, Link2, Circle, Disc, ClipboardCheck,
-  Info, ChevronDown, ChevronUp, Check, RotateCcw, MessageCircle, type LucideIcon,
-} from 'lucide-react';
+import { Droplet, Wind, Zap, Link2, Circle, Disc, ClipboardCheck, Check, RotateCcw, MessageCircle, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
 import { mantenimientosApi } from '../../lib/api';
 import { whatsappCitaLink, WORKSHOP_CONTACT } from '../../lib/constants';
 import {
-  calcularEstadoLocal, etiquetaCC, rangoDeCC, parametrosDeCC,
+  calcularEstadoLocal,
   ESTADO_COLOR,
 } from '../../lib/mantenimiento';
 import type { Moto } from '../../types';
@@ -47,7 +44,6 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
   const canService = isAdmin || isMecanico;       // solo mecánico/admin marca cambios
   const [servicios, setServicios] = useState<Record<string, number>>({});
   const [errorServ, setErrorServ] = useState(false);
-  const [showInfo, setShowInfo]   = useState(false);
 
   /* Carga compartida desde el backend (100% nube, sin almacenamiento local) */
   const cargarServicios = () => {
@@ -98,7 +94,7 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
       .map(e => `• ${e.label}${e.estado === 'VENCIDO' ? ' (urgente)' : ''}`);
     return (
       `¡Hola ${WORKSHOP_CONTACT.nombre}! 🏍️\n\n` +
-      `Quiero agendar una cita para mi moto ${moto.marca} ${moto.modelo} (placa ${moto.placa}).\n` +
+      `Quiero agendar una cita para mi vehículo ${moto.marca} ${moto.modelo} (placa ${moto.placa}).\n` +
       `Kilometraje actual: ${moto.kilometraje.toLocaleString('es-EC')} km.` +
       (pendientes.length ? `\n\nMantenimiento que necesita:\n${pendientes.join('\n')}` : '') +
       `\n\n¿Qué horarios tienen disponibles? Gracias.`
@@ -126,7 +122,6 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
             </span>
           )}
         </div>
-        <span style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(21,21,27,0.5)' }}>{etiquetaCC(moto.cilindraje)}</span>
       </div>
 
       {errorServ && (
@@ -219,48 +214,12 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
       {/* Nota para el mecánico */}
       {canService && (
         <p style={{ fontSize: 10.5, color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.5)', margin: '10px 0 0', lineHeight: 1.5 }}>
-          Al revisar la moto, marca lo que realmente cambiaste a estos {moto.kilometraje.toLocaleString('es-EC')} km.
+          Al revisar el vehículo, marca lo que realmente cambiaste a estos {moto.kilometraje.toLocaleString('es-EC')} km.
           Esa pieza se reinicia a 0%; las demás siguen acumulando hasta su próximo cambio.
         </p>
       )}
 
-      {/* Explicación de cómo se calcula */}
-      <button
-        onClick={() => setShowInfo(s => !s)}
-        style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 12, fontSize: 11.5, fontWeight: 600, color: 'rgba(59,130,246,0.85)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-      >
-        <Info size={13} /> ¿Cómo calculamos esto?
-        {showInfo ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-      </button>
-      {showInfo && <ExplicacionCalculo cc={moto.cilindraje} isDark={isDark} />}
     </div>
   );
 }
 
-/* ════════ Explicación del cálculo para un cilindraje ════════ */
-function ExplicacionCalculo({ cc, isDark = true }: { cc: number; isDark?: boolean }) {
-  const rango  = rangoDeCC(cc);
-  const params = parametrosDeCC(cc);
-  return (
-    <div style={{ marginTop: 12, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 12, padding: '14px 16px' }}>
-      <p style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(21,21,27,0.65)', lineHeight: 1.7, margin: '0 0 12px' }}>
-        Tu moto es de <strong style={{ color: rango.color }}>{cc} cc</strong> → categoría{' '}
-        <strong style={{ color: rango.color }}>{rango.label}</strong>. El desgaste se mide desde el último cambio real:
-      </p>
-      <div style={{ background: isDark ? '#0B0B10' : '#F2F4F7', border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E4E7EC', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
-        <code style={{ fontSize: 11, color: '#10B981', display: 'block', lineHeight: 1.8, fontFamily: 'monospace' }}>
-          desgaste % = (km actual − km del último cambio) ÷ intervalo × 100<br />
-          <span style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(21,21,27,0.5)' }}>→ 80% = avisamos · 100% = toca cambiar</span>
-        </code>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 7 }}>
-        {params.map(p => (
-          <div key={p.tipo} style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)', borderRadius: 8, padding: '7px 10px' }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: isDark ? '#EBEBEB' : '#15151B', margin: 0 }}>{p.label}</p>
-            <p style={{ fontSize: 10, color: rango.color, margin: '1px 0 0', fontWeight: 600 }}>cada {p.intervaloKm.toLocaleString('es-EC')} km</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

@@ -12,7 +12,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
    - En Vercel se puede sobreescribir con VITE_API_URL si hiciera falta. */
 const BASE_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ??
-  'https://backend-openmotors.onrender.com/api';
+  (import.meta.env.DEV ? '/api' : 'https://backend-openmotors.onrender.com/api');
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -366,3 +366,4 @@ export async function uploadWithRetry(
   }
   throw new Error('Upload falló después de 3 intentos');
 }
+

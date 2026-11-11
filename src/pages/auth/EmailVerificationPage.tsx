@@ -135,7 +135,7 @@ export default function EmailVerificationPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#09090C',
+      background: '#FFFFFF',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -169,7 +169,7 @@ export default function EmailVerificationPage() {
         {/* Card */}
         <div style={{
           background: isDark ? 'linear-gradient(160deg, #141419 0%, #0F0F14 100%)' : '#FFFFFF',
-          border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid #E4E7EC',
+          border: isDark ? '1px solid rgba(24,27,35,0.07)' : '1px solid #E4E7EC',
           borderRadius: 22,
           padding: '36px 32px',
           boxShadow: isDark ? '0 28px 70px rgba(0,0,0,0.6)' : '0 28px 70px rgba(0,0,0,0.10)',
@@ -209,12 +209,12 @@ export default function EmailVerificationPage() {
             {verified ? '¡Email verificado!' : 'Verifica tu correo'}
           </h1>
 
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, margin: '0 0 28px', lineHeight: 1.7 }}>
+          <p style={{ color: 'rgba(24,27,35,0.4)', fontSize: 14, margin: '0 0 28px', lineHeight: 1.7 }}>
             {verified
               ? 'Tu cuenta ha sido creada. Te redirigiremos al login en un momento…'
               : <>
                   Enviamos un correo de verificación a{' '}
-                  <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{pending.correo}</strong>.
+                  <strong style={{ color: 'rgba(24,27,35,0.7)' }}>{pending.correo}</strong>.
                   Haz clic en el enlace que te enviamos y luego regresa aquí.
                 </>
             }
@@ -224,8 +224,8 @@ export default function EmailVerificationPage() {
             <>
               {/* Pasos */}
               <div style={{
-                background: 'rgba(255,255,255,0.025)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(24,27,35,0.025)',
+                border: '1px solid rgba(24,27,35,0.06)',
                 borderRadius: 12, padding: '16px 20px', marginBottom: 24,
                 textAlign: 'left',
               }}>
@@ -244,7 +244,7 @@ export default function EmailVerificationPage() {
                       background: 'rgba(66,133,244,0.15)', border: '1px solid rgba(66,133,244,0.25)',
                       borderRadius: 4, padding: '2px 6px', flexShrink: 0, marginTop: 1,
                     }}>{i + 1}</span>
-                    <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    <span style={{ fontSize: 12.5, color: 'rgba(24,27,35,0.5)', lineHeight: 1.6 }}>
                       {step.slice(3)}
                     </span>
                   </div>
@@ -271,7 +271,7 @@ export default function EmailVerificationPage() {
                 {checking ? (
                   <>
                     <svg style={{ animation: 'spin 0.8s linear infinite' }} width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.2)" strokeWidth="3"/>
+                      <circle cx="12" cy="12" r="10" stroke="rgba(24,27,35,0.2)" strokeWidth="3"/>
                       <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round"/>
                     </svg>
                     Comprobando verificación…
@@ -288,8 +288,8 @@ export default function EmailVerificationPage() {
                 style={{
                   width: '100%', height: 42, borderRadius: 10,
                   background: 'transparent',
-                  border: `1px solid ${canResend ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)'}`,
-                  color: canResend ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)',
+                  border: `1px solid ${canResend ? 'rgba(24,27,35,0.12)' : 'rgba(24,27,35,0.05)'}`,
+                  color: canResend ? 'rgba(24,27,35,0.5)' : 'rgba(24,27,35,0.2)',
                   fontSize: 13, fontWeight: 500,
                   cursor: canResend ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
@@ -309,7 +309,7 @@ export default function EmailVerificationPage() {
 
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>
+        <p style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'rgba(24,27,35,0.2)' }}>
           ¿Correo equivocado?{' '}
           <span
             style={{ color: '#FFD700', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}

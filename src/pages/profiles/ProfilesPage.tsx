@@ -18,7 +18,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { initials, extractCedula, getErrorMsg, parsePermisos, setPermisos } from "../../lib/utils";
 import type { Usuario, Rol, Moto } from "../../types";
 import { useNavigate } from "react-router-dom";
-import { Bike, Gauge } from "lucide-react";
+import { Car, Gauge } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
@@ -47,14 +47,10 @@ function getRolName(roles: unknown[]): string {
 /* ── Módulos configurables para mecánicos ── */
 const MECANICO_MODULES = [
   { key: 'registros',   label: 'Registros',   desc: 'Órdenes de servicio' },
-  { key: 'motos',       label: 'Motos',        desc: 'Diagnósticos y perfiles' },
+  { key: 'motos',       label: 'Vehículos',        desc: 'Diagnósticos y perfiles' },
   { key: 'inventario',  label: 'Inventario',   desc: 'Productos y stock' },
   { key: 'proveedores', label: 'Proveedores',  desc: 'Gestión de proveedores' },
   { key: 'clientes',    label: 'Clientes',     desc: 'Historial de clientes' },
-  { key: 'alertas',     label: 'Alertas',      desc: 'Alertas de mantenimiento' },
-  { key: 'puntos',      label: 'Puntos',       desc: 'Sistema de puntos' },
-  { key: 'combustible', label: 'Combustible',  desc: 'Registro de cargas' },
-  { key: 'metodologia', label: 'Metodología',  desc: 'Guías técnicas' },
 ];
 
 /* ── Constantes de roles ── */
@@ -202,8 +198,8 @@ function UserCard({ u, roleName, onAssign, onDelete, onView, motosCount = 0 }: {
             )}
             {motosCount > 0 && (
               <div className="flex items-center gap-2 text-[12px]" style={{ color }}>
-                <Bike size={10} className="shrink-0" style={{ opacity: 0.7 }} />
-                <span className="font-bold">{motosCount} moto{motosCount !== 1 ? "s" : ""} registrada{motosCount !== 1 ? "s" : ""}</span>
+                <Car size={10} className="shrink-0" style={{ opacity: 0.7 }} />
+                <span className="font-bold">{motosCount} vehículo{motosCount !== 1 ? "s" : ""} registrado{motosCount !== 1 ? "s" : ""}</span>
               </div>
             )}
           </div>
@@ -741,7 +737,7 @@ export default function ProfilesPage() {
                 }
                 return (
                   <div className="p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                    <p className="text-[11px] text-emerald-400/70">Acceso solo a sus motos y portal personal.</p>
+                    <p className="text-[11px] text-emerald-400/70">Acceso solo a sus vehículos y portal personal.</p>
                   </div>
                 );
               })()}
@@ -887,11 +883,11 @@ export default function ProfilesPage() {
               {/* Motos del usuario */}
               <div>
                 <p className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase font-black dark:text-white/25 text-slate-900/25 mb-3">
-                  <Bike size={11} /> Motos registradas ({sus.length})
+                  <Car size={11} /> Vehículos registrados ({sus.length})
                 </p>
                 {sus.length === 0 ? (
                   <div className="py-6 text-center rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)" }}>
-                    <p className="text-[12px] dark:text-white/30 text-slate-900/30">Este usuario no tiene motos registradas</p>
+                    <p className="text-[12px] dark:text-white/30 text-slate-900/30">Este usuario no tiene vehículos registrados</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -908,7 +904,7 @@ export default function ProfilesPage() {
                           <img src={m.ruta_imagen_motos} alt={m.placa} className="w-11 h-11 rounded-lg object-cover shrink-0" />
                         ) : (
                           <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
-                            <Bike size={18} className="dark:text-white/30 text-slate-900/30" />
+                            <Car size={18} className="dark:text-white/30 text-slate-900/30" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
@@ -916,7 +912,6 @@ export default function ProfilesPage() {
                           <p className="flex items-center gap-2 text-[11px] dark:text-white/40 text-slate-900/40 mt-0.5">
                             <span className="plate-tag">{m.placa}</span>
                             <span className="flex items-center gap-1"><Gauge size={9} /> {m.kilometraje.toLocaleString("es-EC")} km</span>
-                            <span>· {m.cilindraje} cc</span>
                           </p>
                         </div>
                         <ChevronRight size={15} className="dark:text-white/25 text-slate-900/25 shrink-0" />

@@ -46,3 +46,5 @@ export function whatsappCitaLink(mensaje = ''): string {
   const base = `https://wa.me/${WORKSHOP_CONTACT.whatsappCitas}`;
   return mensaje ? `${base}?text=${encodeURIComponent(mensaje)}` : base;
 }
+
+export const VEHICLE_TYPES = ['Sedán', 'Hatchback', 'SUV', 'Pickup', 'Coupé', 'Van', 'Otro'];

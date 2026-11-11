@@ -11,16 +11,16 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { useToast } from '../ui/Toast';
 import { useTheme } from '../../lib/theme';
-import { registrosApi, mantenimientosApi, combustibleApi } from '../../lib/api';
+import { registrosApi, mantenimientosApi } from '../../lib/api';
 import { fmtMoney, getErrorMsg } from '../../lib/utils';
 import {
   CATEGORIAS_REPUESTO, buildManoDescripcion, buildRepuestoDescripcion,
   buildDescuentoPuntosDescripcion, cleanDescripcion, detalleCategoria, detalleKind,
   detalleCostoManual, parseDescuentoPuntos,
 } from '../../lib/detalles';
-import { descuentoUsdPorPuntos, puntosCliente, puntosPorDescuentoUsd } from '../../lib/puntos';
+import { puntosPorDescuentoUsd } from '../../lib/puntos';
 import { tiposMantenimientoEnTexto } from '../../lib/mantenimiento';
-import type { CargaCombustible, Moto, RegistroDetalle, Producto, Usuario } from '../../types';
+import type { Moto, RegistroDetalle, Producto, Usuario } from '../../types';
 
 interface LineItem {
   uid:        string;
@@ -61,7 +61,7 @@ interface Props {
 }
 
 export default function FacturaEditor({
-  open, registro, productos, usuarios = [], registros = [], motos = [],
+  open, registro, productos,
   completarAlGuardar = false, onClose, onSaved,
 }: Props) {
   const [theme] = useTheme();
@@ -73,7 +73,6 @@ export default function FacturaEditor({
   const [saving, setSaving]   = useState(false);
   const [prodOpen, setProdOpen] = useState(false);
   const [prodQuery, setProdQuery] = useState('');
-  const [combustible, setCombustible] = useState<CargaCombustible[]>([]);
 
   /* Factura emitida (estado 4 = Facturado) → solo lectura: ya no se edita, solo se ven los detalles. */
   const readOnly = (registro?.estado ?? 0) >= 4;
@@ -85,9 +84,6 @@ export default function FacturaEditor({
     setProdOpen(false);
     setProdQuery('');
     const idFactura = registro.id_factura;
-    combustibleApi.list()
-      .then(({ data }) => setCombustible(data as CargaCombustible[]))
-      .catch(() => setCombustible([]));
     if (!idFactura) return;
     setLoading(true);
     registrosApi.detalles(idFactura)
@@ -100,7 +96,7 @@ export default function FacturaEditor({
             uid: nextUid(),
             kind,
             idProducto: d.idProducto ?? null,
-            nombre: cleanDescripcion(d.descripcion) || (kind === 'descuento' ? 'Descuento por puntos' : kind === 'mano' ? 'Mano de obra' : 'Repuesto'),
+            nombre: cleanDescripcion(d.descripcion) || (kind === 'descuento' ? 'Descuento histórico' : kind === 'mano' ? 'Mano de obra' : 'Repuesto'),
             cantidad: d.cantidad ?? 1,
             precio: Number(d.precioUnitario ?? 0),
             costo: detalleCostoManual(d.descripcion),
@@ -129,33 +125,6 @@ export default function FacturaEditor({
   const subtotalAntesDescuento = totalMano + totalRep;
   const total = subtotalAntesDescuento + totalDesc;
 
-  const clienteFactura = useMemo(() => {
-    if (!registro) return null;
-    if (registro.id_cliente != null) {
-      return usuarios.find(u => u.id_usuario === registro.id_cliente) ?? null;
-    }
-    const moto = motos.find(m => m.id_moto === registro.id_moto || m.placa === registro.placa);
-    return usuarios.find(u => u.id_usuario === moto?.id_usuario || u.nombre_completo === registro.nombre_cliente) ?? null;
-  }, [registro, usuarios, motos]);
-
-  const puntosInfo = useMemo(() => {
-    if (!clienteFactura) return null;
-    const motosCliente = motos.filter(m => m.id_usuario === clienteFactura.id_usuario);
-    return puntosCliente({ usuario: clienteFactura, motos: motosCliente, registros, combustible });
-  }, [clienteFactura, motos, registros, combustible]);
-
-  const puntosEnFactura = useMemo(
-    () => items.filter(i => i.kind === 'descuento').reduce((s, i) => s + (i.puntos ?? 0), 0),
-    [items],
-  );
-  const puntosDisponiblesParaFactura = (puntosInfo?.disponibles ?? 0) + puntosEnFactura;
-  const puntosMostrados = readOnly ? (puntosInfo?.disponibles ?? 0) : puntosDisponiblesParaFactura;
-  const puntosMaxPorTotal = Math.floor(Math.max(0, subtotalAntesDescuento) / 5) * 100;
-  const puntosAplicables = Math.min(
-    Math.floor(puntosDisponiblesParaFactura / 100) * 100,
-    puntosMaxPorTotal,
-  );
-
   /* ── Helpers de edición ── */
   const addMano = () =>
     setItems(p => [...p, { uid: nextUid(), kind: 'mano', idProducto: null, nombre: '', cantidad: 1, precio: 0, costo: 0, categoria: '' }]);
@@ -173,24 +142,6 @@ export default function FacturaEditor({
   const patch = (uid: string, upd: Partial<LineItem>) =>
     setItems(p => p.map(i => i.uid === uid ? { ...i, ...upd } : i));
   const remove = (uid: string) => setItems(p => p.filter(i => i.uid !== uid));
-  const quitarCupon = () => setItems(p => p.filter(i => i.kind !== 'descuento'));
-  const aplicarCupon = () => {
-    if (puntosAplicables < 100) {
-      toast.error('Este cliente no tiene puntos suficientes para canjear.');
-      return;
-    }
-    const descuento = descuentoUsdPorPuntos(puntosAplicables);
-    setItems(p => [
-      ...p.filter(i => i.kind !== 'descuento'),
-      {
-        uid: nextUid(), kind: 'descuento', idProducto: null,
-        nombre: 'Descuento por puntos', cantidad: 1, precio: -descuento,
-        costo: 0, categoria: '', puntos: puntosAplicables,
-      },
-    ]);
-    toast.success(`Cupón aplicado: ${puntosAplicables} pts (${fmtMoney(descuento)}).`);
-  };
-
   const prodsFiltrados = useMemo(() => {
     const q = prodQuery.trim().toLowerCase();
     const base = productos.filter(p => (p.stock ?? 0) > 0 || q);
@@ -215,7 +166,7 @@ export default function FacturaEditor({
       if (i.cantidad <= 0) { toast.error('La cantidad debe ser mayor a 0.'); return; }
       if (i.kind === 'descuento') {
         if (i.precio >= 0 || (i.puntos ?? 0) < 100) {
-          toast.error('El cupón de puntos no es válido.');
+          toast.error('El descuento histórico no es válido.');
           return;
         }
         continue;
@@ -321,7 +272,7 @@ export default function FacturaEditor({
               ? <Wrench size={14} color="#3B82F6" />
               : <Package size={14} color="#F59E0B" />}
           <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: rowColor }}>
-            {esDesc ? `Cupón de puntos · ${i.puntos ?? 0} pts` : i.kind === 'mano' ? 'Mano de obra' : esInv ? 'Repuesto · inventario' : 'Repuesto manual'}
+            {esDesc ? `Descuento histórico` : i.kind === 'mano' ? 'Mano de obra' : esInv ? 'Repuesto · inventario' : 'Repuesto manual'}
           </span>
           {!readOnly && (
             <button onClick={() => remove(i.uid)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', display: 'flex' }} title="Quitar">
@@ -465,34 +416,7 @@ export default function FacturaEditor({
             </div>
           )}
 
-          {clienteFactura && puntosInfo && (
-            <div style={{ background: isDark ? 'rgba(16,185,129,0.06)' : '#F0FDF4', border: `1px solid ${isDark ? 'rgba(16,185,129,0.18)' : '#BBF7D0'}`, borderRadius: 10, padding: '10px 12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <Gift size={15} color="#10B981" />
-                <div style={{ flex: 1, minWidth: 180 }}>
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 900, color: txt }}>{clienteFactura.nombre_completo}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 11, color: muted }}>
-                    Ganados {puntosInfo.ganados} pts · Canjeados {puntosInfo.canjeados} pts · Disponibles {puntosMostrados} pts
-                  </p>
-                </div>
-                <span style={{ fontSize: 14, fontWeight: 900, color: '#10B981' }}>
-                  {fmtMoney(descuentoUsdPorPuntos(puntosMostrados))}
-                </span>
-                {!readOnly && (
-                  puntosEnFactura > 0 ? (
-                    <button onClick={quitarCupon} style={addBtn('#EF4444', isDark)}>
-                      <X size={13} /> Quitar cupón
-                    </button>
-                  ) : (
-                    <button onClick={aplicarCupon} disabled={puntosAplicables < 100 || subtotalAntesDescuento <= 0}
-                      style={{ ...addBtn('#10B981', isDark), opacity: puntosAplicables < 100 || subtotalAntesDescuento <= 0 ? 0.45 : 1 }}>
-                      <Gift size={13} /> Aplicar {puntosAplicables} pts
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
-          )}
+
 
           {/* Botones para agregar */}
           {!readOnly && (
@@ -574,7 +498,7 @@ export default function FacturaEditor({
             </div>
             {totalDesc !== 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: muted, display: 'flex', alignItems: 'center', gap: 6 }}><Gift size={12} color="#10B981" /> Descuento puntos</span>
+                <span style={{ fontSize: 12, color: muted, display: 'flex', alignItems: 'center', gap: 6 }}><Gift size={12} color="#10B981" /> Descuento histórico</span>
                 <span style={{ fontSize: 13, fontWeight: 800, color: '#10B981' }}>{fmtMoney(totalDesc)}</span>
               </div>
             )}

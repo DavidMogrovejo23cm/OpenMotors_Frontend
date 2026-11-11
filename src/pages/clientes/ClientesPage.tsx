@@ -1,60 +1,29 @@
+import type { LucideIcon } from 'lucide-react';
+import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
    Open Motors — Gestión de Clientes
-   Vista 360: servicios, motos, compras, puntos, combustible
+   Historial de servicios, vehículos y compras
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  Search, Users, Phone, MapPin, Mail,
-  Lock, Unlock, ChevronRight, Wrench,
-  Shield, ArrowLeft, CreditCard, TrendingUp,
-  Calendar, Bike, Activity, CheckCircle,
-  Clock, Package, Star,
-  ChevronDown, ChevronUp, Fuel, Gift,
-  Gauge, Zap, Send,
-} from 'lucide-react';
+import { Search, Users, Phone, MapPin, Mail, Lock, Unlock, ChevronRight, Wrench, Shield, ArrowLeft, CreditCard, TrendingUp, Calendar, Car, Activity, CheckCircle, Clock, Package, ChevronDown, ChevronUp, Gauge, Send } from 'lucide-react';
 import { safeFromTo } from '../../hooks/useGsap';
 import {
   usuariosApi, registrosApi, motosApi,
-  combustibleApi, facturasApi, detallesFacturaApi, authApi, ofertaApi,
+  facturasApi, detallesFacturaApi, authApi, ofertaApi,
 } from '../../lib/api';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtDate, fmtMoney, ESTADO_REGISTRO, extractPhone, extractCedula, initials, toIsoStr } from '../../lib/utils';
 import { imagenMoto } from '../../lib/fotos';
 import { cleanDescripcion, detalleKind } from '../../lib/detalles';
-import type { Usuario, Moto, CargaCombustible, Factura, DetalleFactura } from '../../types';
+import type { Usuario, Moto, Factura, DetalleFactura } from '../../types';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 
 /* ═══ PUNTOS (misma lógica que PuntosPage) ═══ */
-const POINTS_TABLE = [
-  { max: 125,   pts: 5  },
-  { max: 200,   pts: 8  },
-  { max: 400,   pts: 12 },
-  { max: 650,   pts: 18 },
-  { max: 99999, pts: 25 },
-];
-function ptsForCc(cc: number) { return POINTS_TABLE.find(r => cc <= r.max)?.pts ?? 5; }
-const OIL_KW = ['cambio de aceite', 'aceite', 'oil'];
-function isOilChange(tipo: string, desc: string) {
-  return OIL_KW.some(k => tipo?.toLowerCase().includes(k) || desc?.toLowerCase().includes(k));
-}
-const LEVELS: { min: number; label: string; color: string; icon: string }[] = [
-  { min: 0,   label: 'Rookie',   color: '#9CA3AF', icon: '🔩' },
-  { min: 50,  label: 'Mecánico', color: '#10B981', icon: '🔧' },
-  { min: 150, label: 'Experto',  color: '#3B82F6', icon: '⚙️' },
-  { min: 300, label: 'Pro',      color: '#8B5CF6', icon: '🏆' },
-  { min: 600, label: 'Élite',    color: '#F59E0B', icon: '👑' },
-];
-function getLevel(pts: number) { return [...LEVELS].reverse().find(l => pts >= l.min) ?? LEVELS[0]; }
-function nextLevelOf(pts: number) {
-  const idx = LEVELS.findIndex(l => l === getLevel(pts));
-  return idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
-}
-
 /* ═══ TIPOS ═══════════════════════════════════ */
 interface Reg {
   id: number;
@@ -71,7 +40,7 @@ interface Reg {
 
 type BV = 'warning'|'info'|'success'|'purple'|'teal'|'default';
 const VARIANT_MAP: Record<number, BV> = { 0:'warning', 1:'info', 2:'success', 3:'purple', 4:'teal' };
-type DetailTab = 'servicios' | 'motos' | 'compras' | 'puntos' | 'combustible';
+type DetailTab = 'servicios' | 'motos' | 'compras';
 
 /* ═══ HELPERS ═════════════════════════════════ */
 function normalizeReg(r: Record<string,unknown>): Reg {
@@ -116,7 +85,7 @@ function Avatar({ name, size='md' }: { name:string; size?:'sm'|'md'|'lg'|'xl' })
 }
 
 function StatChip({ icon:Icon, label, value, color='#3B82F6' }:{
-  icon:React.ElementType; label:string; value:string|number; color?:string;
+  icon:LucideIcon; label:string; value:string|number; color?:string;
 }) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background:`${color}12`, border:`1px solid ${color}28` }}>
@@ -133,11 +102,10 @@ function StatChip({ icon:Icon, label, value, color='#3B82F6' }:{
 }
 
 /* ═══ HISTORIAL PANEL — 360° ══════════════════ */
-function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, onBack, onUnlock }: {
+function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnlock }: {
   client: Usuario;
   regs: Reg[];
   motos: Moto[];
-  combustible: CargaCombustible[];
   facturas: Factura[];
   unlocked: boolean;
   onBack: ()=>void;
@@ -154,20 +122,6 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
   const done   = regs.filter(r=>r.estado>=2).length;
   const pending= regs.filter(r=>r.estado<2).length;
 
-  /* ── Puntos ── */
-  const motoMap = useMemo(() => new Map(motos.map(m => [m.placa, m])), [motos]);
-  const pointsHist = useMemo(() => regs.map(r => {
-    const moto = motoMap.get(r.placa);
-    const cc   = moto?.cilindraje ?? 125;
-    const pts  = ptsForCc(cc);
-    const bono = isOilChange(r.tipo_servicio, r.descripcion) ? 3 : 0;
-    return { ...r, pts, bono, ptTotal: pts + bono };
-  }), [regs, motoMap]);
-  const totalPts = pointsHist.reduce((s,h)=>s+h.ptTotal, 0);
-  const nivel    = getLevel(totalPts);
-  const nextLvl  = nextLevelOf(totalPts);
-  const lvlPct   = nextLvl ? Math.round(((totalPts - nivel.min) / (nextLvl.min - nivel.min)) * 100) : 100;
-
   /* ── Compras: toggle expand ── */
   const toggleFac = async (facId: number) => {
     if (expandedFac === facId) { setExpandedFac(null); return; }
@@ -182,12 +136,10 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
     }
   };
 
-  const TABS: { id: DetailTab; label: string; icon: React.ElementType; count?: number }[] = [
+  const TABS: { id: DetailTab; label: string; icon: LucideIcon; count?: number }[] = [
     { id:'servicios',   label:'Servicios',   icon:Wrench,  count:regs.length },
-    { id:'motos',       label:'Motos',       icon:Bike,    count:motos.length },
+    { id:'motos',       label:'Vehículos',       icon:Car,    count:motos.length },
     { id:'compras',     label:'Compras',     icon:Package, count:facturas.length },
-    { id:'puntos',      label:'Puntos',      icon:Star },
-    { id:'combustible', label:'Combustible', icon:Fuel,    count:combustible.length },
   ];
 
   return (
@@ -276,7 +228,6 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
             <StatChip icon={CheckCircle} label="Completos"  value={done}            color="#10B981" />
             <StatChip icon={Clock}       label="Pendientes" value={pending}         color="#F59E0B" />
             <StatChip icon={TrendingUp}  label="Gastado"    value={fmtMoney(total)} color="#8B5CF6" />
-            <StatChip icon={Star}        label="Puntos"     value={totalPts}        color={nivel.color} />
           </div>
         </div>
       </div>
@@ -334,7 +285,7 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 flex-wrap text-[11px] dark:text-white/30 text-slate-900/30">
                         <span className="flex items-center gap-1"><Calendar size={9} />{fmtDate(r.fecha)}</span>
-                        {r.kilometraje ? <span className="flex items-center gap-1"><Bike size={9} />{r.kilometraje.toLocaleString('es-EC')} km</span> : null}
+                        {r.kilometraje ? <span className="flex items-center gap-1"><Car size={9} />{r.kilometraje.toLocaleString('es-EC')} km</span> : null}
                         {r.descripcion ? <span className="italic truncate max-w-[160px]">{r.descripcion}</span> : null}
                       </div>
                       {r.descripcion ? (
@@ -372,13 +323,13 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
       {tab === 'motos' && (
         <div>
           <p className="text-[10px] tracking-[0.3em] uppercase dark:text-white/20 text-slate-900/20 font-black mb-3 flex items-center gap-2">
-            <Bike size={10} className="text-gm-red" />
+            <Car size={10} className="text-gm-red" />
             Motocicletas registradas ({motos.length})
           </p>
           {motos.length === 0 ? (
             <div className="gm-card-d rounded-2xl py-16 text-center">
-              <Bike size={28} className="mx-auto dark:text-white/10 text-slate-900/10 mb-3" />
-              <p className="dark:text-white/25 text-slate-900/25 text-sm">Sin motos registradas</p>
+              <Car size={28} className="mx-auto dark:text-white/10 text-slate-900/10 mb-3" />
+              <p className="dark:text-white/25 text-slate-900/25 text-sm">Sin vehículos registrados</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -392,7 +343,7 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
                     ) : (
                       <div className="w-20 h-16 rounded-xl shrink-0 flex items-center justify-center"
                            style={{ background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
-                        <Bike size={22} style={{ color:'#3B82F6' }} />
+                        <Car size={22} style={{ color:'#3B82F6' }} />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -408,7 +359,6 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] dark:text-white/35 text-slate-900/35">
                         <span className="flex items-center gap-1"><Calendar size={9} />{m.anio}</span>
                         <span className="flex items-center gap-1"><Gauge size={9} />{m.kilometraje.toLocaleString('es-EC')} km</span>
-                        <span className="flex items-center gap-1"><Zap size={9} />{m.cilindraje} cc</span>
                         <span className="capitalize">{m.tipo_moto}</span>
                       </div>
                     </div>
@@ -518,169 +468,6 @@ function HistoryPanel({ client, regs, motos, combustible, facturas, unlocked, on
         </div>
       )}
 
-      {/* ── Tab: PUNTOS ── */}
-      {tab === 'puntos' && (
-        <div className="space-y-4">
-          {/* Hero nivel */}
-          <div className="gm-card-d rounded-2xl p-6 text-center relative overflow-hidden"
-               style={{
-                 background:`linear-gradient(135deg, #17171E 0%, ${nivel.color}10 60%, #111115 100%)`,
-                 borderColor:`${nivel.color}28`,
-               }}>
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-56 h-56 rounded-full opacity-10"
-                   style={{ background:`radial-gradient(circle, ${nivel.color}30 0%, transparent 70%)` }} />
-            </div>
-            <div className="relative z-10">
-              <div className="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center text-3xl"
-                   style={{ background:`${nivel.color}18`, border:`2px solid ${nivel.color}35` }}>
-                {nivel.icon}
-              </div>
-              <p className="text-[11px] tracking-[0.3em] uppercase font-black mb-1" style={{ color:`${nivel.color}80` }}>
-                Nivel actual
-              </p>
-              <p className="font-black text-2xl mt-0.5" style={{ color:nivel.color }}>
-                {nivel.icon} {nivel.label}
-              </p>
-              <p className="text-4xl font-black dark:text-white text-slate-900 mt-3">{totalPts}</p>
-              <p className="text-[12px] dark:text-white/30 text-slate-900/30 mt-1">puntos acumulados · {fmtMoney(totalPts / 20)} en cashback</p>
-
-              {nextLvl && (
-                <div className="mt-4 max-w-xs mx-auto">
-                  <div className="flex justify-between text-[10px] dark:text-white/30 text-slate-900/30 mb-1.5">
-                    <span>{totalPts} pts</span>
-                    <span>{nextLvl.min} pts para {nextLvl.icon} {nextLvl.label}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700"
-                         style={{ width:`${lvlPct}%`, background:nivel.color, boxShadow:`0 0 8px ${nivel.color}50` }} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Stats de puntos */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="gm-card-d rounded-xl p-3 text-center">
-              <p className="text-xl font-black dark:text-white/80 text-slate-900/80">{totalPts}</p>
-              <p className="text-[10px] dark:text-white/25 text-slate-900/25 uppercase tracking-wider mt-0.5">Ganados</p>
-            </div>
-            <div className="gm-card-d rounded-xl p-3 text-center">
-              <p className="text-xl font-black dark:text-white/80 text-slate-900/80">0</p>
-              <p className="text-[10px] dark:text-white/25 text-slate-900/25 uppercase tracking-wider mt-0.5">Canjeados</p>
-            </div>
-            <div className="gm-card-d rounded-xl p-3 text-center">
-              <p className="text-xl font-black" style={{ color:nivel.color }}>{totalPts}</p>
-              <p className="text-[10px] dark:text-white/25 text-slate-900/25 uppercase tracking-wider mt-0.5">Disponibles</p>
-            </div>
-          </div>
-
-          {/* Historial de puntos */}
-          {pointsHist.length > 0 && (
-            <div>
-              <p className="text-[10px] tracking-[0.3em] uppercase dark:text-white/20 text-slate-900/20 font-black mb-3 flex items-center gap-2">
-                <Gift size={10} className="text-gm-red" />
-                Historial de puntos
-              </p>
-              <div className="space-y-1.5">
-                {pointsHist.map((h, i) => (
-                  <div key={i} className="gm-card-d rounded-xl p-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-[12px]"
-                         style={{ background:`${nivel.color}15`, border:`1px solid ${nivel.color}25` }}>
-                      <Star size={13} style={{ color:nivel.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-bold dark:text-white/80 text-slate-900/80 truncate">{h.tipo_servicio || 'Servicio'}</p>
-                      <p className="text-[10px] dark:text-white/30 text-slate-900/30 flex items-center gap-1 mt-0.5">
-                        <Calendar size={8} />{fmtDate(h.fecha)}
-                        {h.placa && <><span>·</span><span className="plate-tag text-[9px] py-0">{h.placa}</span></>}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[13px] font-black" style={{ color:nivel.color }}>+{h.ptTotal}</p>
-                      {h.bono > 0 && (
-                        <p className="text-[9px] text-emerald-400/70">+{h.bono} bono aceite</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Tab: COMBUSTIBLE ── */}
-      {tab === 'combustible' && (
-        <div>
-          <p className="text-[10px] tracking-[0.3em] uppercase dark:text-white/20 text-slate-900/20 font-black mb-3 flex items-center gap-2">
-            <Fuel size={10} className="text-gm-red" />
-            Historial de combustible ({combustible.length})
-          </p>
-          {combustible.length === 0 ? (
-            <div className="gm-card-d rounded-2xl py-16 text-center">
-              <Fuel size={28} className="mx-auto dark:text-white/10 text-slate-900/10 mb-3" />
-              <p className="dark:text-white/25 text-slate-900/25 text-sm">Sin registros de combustible</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {/* Resumen */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="gm-card-d rounded-xl p-3 text-center">
-                  <p className="text-xl font-black text-amber-400">
-                    {combustible.reduce((s,c)=>s+c.litros, 0).toFixed(1)}
-                  </p>
-                  <p className="text-[10px] dark:text-white/25 text-slate-900/25 uppercase tracking-wider mt-0.5">Litros</p>
-                </div>
-                <div className="gm-card-d rounded-xl p-3 text-center">
-                  <p className="text-xl font-black text-orange-400">
-                    {fmtMoney(combustible.reduce((s,c)=>s+c.costo_total, 0))}
-                  </p>
-                  <p className="text-[10px] dark:text-white/25 text-slate-900/25 uppercase tracking-wider mt-0.5">Gastado</p>
-                </div>
-                <div className="gm-card-d rounded-xl p-3 text-center">
-                  <p className="text-xl font-black dark:text-white/70 text-slate-900/70">{combustible.length}</p>
-                  <p className="text-[10px] dark:text-white/25 text-slate-900/25 uppercase tracking-wider mt-0.5">Cargas</p>
-                </div>
-              </div>
-
-              {combustible
-                .slice()
-                .sort((a,b)=>toIsoStr(b.fecha).localeCompare(toIsoStr(a.fecha)))
-                .map((c, i) => {
-                  const recorrido = c.km_actual && c.km_anterior ? c.km_actual - c.km_anterior : null;
-                  const rendimiento = recorrido && c.litros > 0 ? (recorrido / c.litros).toFixed(1) : null;
-                  return (
-                    <div key={c.id || i} className="gm-card-d rounded-2xl p-4 flex items-center gap-4">
-                      <div className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center"
-                           style={{ background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.2)' }}>
-                        <Fuel size={15} style={{ color:'#F59E0B' }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-[13px] font-bold dark:text-white/85 text-slate-900/85">
-                            {c.litros} L
-                            {(c as unknown as Record<string, unknown>).tipo_combustible
-                              ? ` · ${(c as unknown as Record<string, unknown>).tipo_combustible}`
-                              : c.marca_aceite ? ` · ${c.marca_aceite}` : ''}
-                          </p>
-                          {c.placa && <span className="plate-tag text-[10px] py-0">{c.placa}</span>}
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5 flex-wrap text-[11px] dark:text-white/30 text-slate-900/30">
-                          <span className="flex items-center gap-1"><Calendar size={9} />{fmtDate(c.fecha)}</span>
-                          {c.km_actual ? <span className="flex items-center gap-1"><Gauge size={9} />{c.km_actual.toLocaleString('es-EC')} km</span> : null}
-                          {rendimiento && <span className="flex items-center gap-1"><Zap size={9} />{rendimiento} km/L</span>}
-                        </div>
-                      </div>
-                      <p className="text-sm font-bold text-amber-400 tabular-nums shrink-0">{fmtMoney(c.costo_total)}</p>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -832,7 +619,6 @@ export default function ClientesPage() {
   const [clientes,    setClientes]    = useState<Usuario[]>([]);
   const [regs,        setRegs]        = useState<Reg[]>([]);
   const [motos,       setMotos]       = useState<Moto[]>([]);
-  const [combustible, setCombustible] = useState<CargaCombustible[]>([]);
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState('');
@@ -851,23 +637,12 @@ export default function ClientesPage() {
   const [ofertaMensaje, setOfertaMensaje] = useState('');
   const [ofertaRoles,   setOfertaRoles]   = useState<number[]>([2]);
   const [ofertaLoading, setOfertaLoading] = useState(false);
-  // Filtro por cilindraje: null = todos; si hay rango solo se envía a dueños con moto en ese rango
-  const [ccFiltro, setCcFiltro] = useState<{ min: number; max: number; label: string } | null>(null);
+  const [tipoFiltro, setTipoFiltro] = useState('');
 
-  const CC_RANGOS = [
-    { min:   0, max: 125, label: 'Urbana (≤125 cc)'           },
-    { min: 126, max: 200, label: 'Semideportiva (126–200 cc)' },
-    { min: 201, max: 400, label: 'Deportiva (201–400 cc)'     },
-    { min: 401, max: 650, label: 'Alto rend. (401–650 cc)'    },
-    { min: 651, max: 9999,label: 'Supersport (651+ cc)'       },
-  ];
-
-  /** Correos de clientes cuya(s) moto(s) entran en el rango de cilindraje seleccionado */
-  const correosFiltradosPorCC = (() => {
-    if (!ccFiltro) return null; // sin filtro → enviar por rol
-    const { min, max } = ccFiltro;
+  const correosFiltrados = (() => {
+    if (!tipoFiltro) return null;
     const duenosIds = new Set(
-      motos.filter(m => m.cilindraje >= min && m.cilindraje <= max).map(m => m.id_usuario)
+      motos.filter(m => m.tipo_moto === tipoFiltro).map(m => m.id_usuario)
     );
     return clientes
       .filter(c => duenosIds.has(c.id_usuario) && c.correo && !c.correo.endsWith('@gmotors.local'))
@@ -879,9 +654,9 @@ export default function ClientesPage() {
     setOfertaLoading(true);
     try {
       let d: { enviados: number; total: number };
-      if (correosFiltradosPorCC) {
-        if (!correosFiltradosPorCC.length) { toast.error('No hay clientes con ese rango de cilindraje'); setOfertaLoading(false); return; }
-        const r = await ofertaApi.enviarAEmails(ofertaAsunto.trim(), ofertaMensaje.trim(), correosFiltradosPorCC);
+      if (correosFiltrados) {
+        if (!correosFiltrados.length) { toast.error('No hay clientes con ese tipo de vehículo'); setOfertaLoading(false); return; }
+        const r = await ofertaApi.enviarAEmails(ofertaAsunto.trim(), ofertaMensaje.trim(), correosFiltrados);
         d = r.data as typeof d;
       } else {
         const r = await ofertaApi.enviar(ofertaAsunto.trim(), ofertaMensaje.trim(), ofertaRoles);
@@ -892,7 +667,7 @@ export default function ClientesPage() {
       setOfertaAsunto('');
       setOfertaMensaje('');
       setOfertaRoles([2]);
-      setCcFiltro(null);
+      setTipoFiltro('');
     } catch {
       toast.error('Error al enviar la campaña');
     } finally { setOfertaLoading(false); }
@@ -903,11 +678,10 @@ export default function ClientesPage() {
     if (!pageUnlocked) return;
     setLoading(true);
     try {
-      const [uRes, rRes, mRes, cRes, fRes] = await Promise.allSettled([
+      const [uRes, rRes, mRes, fRes] = await Promise.allSettled([
         usuariosApi.list(),
         registrosApi.list(),
         motosApi.list(),
-        combustibleApi.list(),
         facturasApi.list(),
       ]);
       if (uRes.status === 'fulfilled') {
@@ -923,7 +697,6 @@ export default function ClientesPage() {
         setRegs((rRes.value.data as Record<string,unknown>[]).map(normalizeReg));
       }
       if (mRes.status === 'fulfilled') setMotos(mRes.value.data as Moto[]);
-      if (cRes.status === 'fulfilled') setCombustible(cRes.value.data as CargaCombustible[]);
       if (fRes.status === 'fulfilled') setFacturas(fRes.value.data as Factura[]);
     } catch { toast.error('Error cargando datos'); }
     finally { setLoading(false); }
@@ -958,10 +731,6 @@ export default function ClientesPage() {
   const motosOf = useCallback((uid: number) =>
     motos.filter(m => m.id_usuario === uid), [motos]);
 
-  const combustibleOf = useCallback((uid: number) => {
-    const placas = new Set(motos.filter(m => m.id_usuario === uid).map(m => m.placa));
-    return combustible.filter(c => placas.has(c.placa));
-  }, [motos, combustible]);
 
   const facturasOf = useCallback((uid: number) =>
     facturas.filter(f => f.id_usuario === uid), [facturas]);
@@ -1035,7 +804,6 @@ export default function ClientesPage() {
           client={selected}
           regs={regsOf(selected.nombre_completo)}
           motos={motosOf(selected.id_usuario)}
-          combustible={combustibleOf(selected.id_usuario)}
           facturas={facturasOf(selected.id_usuario)}
           unlocked={true}
           onBack={() => setSelected(null)}
@@ -1193,7 +961,7 @@ export default function ClientesPage() {
       {/* ── Modal: Enviar oferta por email ── */}
       <Modal
         open={ofertaOpen}
-        onClose={() => { setOfertaOpen(false); setOfertaAsunto(''); setOfertaMensaje(''); setOfertaRoles([2]); setCcFiltro(null); }}
+        onClose={() => { setOfertaOpen(false); setOfertaAsunto(''); setOfertaMensaje(''); setOfertaRoles([2]); setTipoFiltro(''); }}
         title="Enviar oferta a clientes"
         size="md"
         footer={
@@ -1214,8 +982,8 @@ export default function ClientesPage() {
             <Mail size={18} className="text-gm-red shrink-0" />
             <div>
               <p className="text-[12px] font-black dark:text-white/80 text-slate-900/80">
-                {correosFiltradosPorCC
-                  ? `${correosFiltradosPorCC.length} clientes con moto en rango ${ccFiltro?.label}`
+                {correosFiltrados
+                  ? `${correosFiltrados.length} clientes con vehículo de tipo ${tipoFiltro}`
                   : `${clientes.filter(c => !c.correo?.endsWith('@gmotors.local') && ofertaRoles.includes(2)).length} clientes con correo real`
                 }
               </p>
@@ -1237,7 +1005,7 @@ export default function ClientesPage() {
                 return (
                   <button
                     key={id}
-                    onClick={() => { setOfertaRoles(prev => active ? prev.filter(r => r !== id) : [...prev, id]); setCcFiltro(null); }}
+                    onClick={() => { setOfertaRoles(prev => active ? prev.filter(r => r !== id) : [...prev, id]); setTipoFiltro(''); }}
                     className="px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all"
                     style={{
                       background: active ? `${color}18` : 'rgba(255,255,255,0.04)',
@@ -1252,28 +1020,28 @@ export default function ClientesPage() {
             </div>
           </div>
 
-          {/* Filtro por cilindraje */}
+          {/* Filtro por tipo de vehículo */}
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.15em] dark:text-white/35 text-slate-900/35 mb-2">Filtrar por cilindraje <span className="normal-case font-medium opacity-60">(opcional)</span></p>
+            <p className="text-[11px] font-black uppercase tracking-[0.15em] dark:text-white/35 text-slate-900/35 mb-2">Filtrar por tipo de vehículo <span className="normal-case font-medium opacity-60">(opcional)</span></p>
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={() => setCcFiltro(null)}
+                onClick={() => setTipoFiltro('')}
                 className="px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all"
                 style={{
-                  background: !ccFiltro ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
-                  color:      !ccFiltro ? '#F59E0B' : 'rgba(255,255,255,0.35)',
-                  border:     `1px solid ${!ccFiltro ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  background: !tipoFiltro ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
+                  color:      !tipoFiltro ? '#F59E0B' : 'rgba(255,255,255,0.35)',
+                  border:     `1px solid ${!tipoFiltro ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`,
                 }}
               >
                 Todos
               </button>
-              {CC_RANGOS.map(r => {
-                const active = ccFiltro?.min === r.min;
-                const count = motos.filter(m => m.cilindraje >= r.min && m.cilindraje <= r.max).length;
+              {VEHICLE_TYPES.map(tipo => {
+                const active = tipoFiltro === tipo;
+                const count = motos.filter(m => m.tipo_moto === tipo).length;
                 return (
                   <button
-                    key={r.min}
-                    onClick={() => setCcFiltro(active ? null : r)}
+                    key={tipo}
+                    onClick={() => setTipoFiltro(active ? '' : tipo)}
                     className="px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all"
                     style={{
                       background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
@@ -1281,7 +1049,7 @@ export default function ClientesPage() {
                       border:     `1px solid ${active ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`,
                     }}
                   >
-                    {r.label} <span style={{ opacity: 0.6 }}>({count})</span>
+                    {tipo} <span style={{ opacity: 0.6 }}>({count})</span>
                   </button>
                 );
               })}

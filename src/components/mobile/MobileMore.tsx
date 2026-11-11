@@ -4,12 +4,7 @@
    agrupados de forma lógica. Reemplaza el drawer en el APK.
    ───────────────────────────────────────────── */
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard, Wrench, Bike, Package, Truck, UserCheck, CreditCard,
-  Users, Star, Bell, ClipboardList, Fuel, Wallet, BookOpen, Globe,
-  LogOut, X, type LucideIcon,
-} from 'lucide-react';
-import { Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Wrench, Car, Package, Truck, UserCheck, CreditCard, Users, ClipboardList, Fuel, Wallet, BookOpen, Globe, LogOut, X, type LucideIcon } from 'lucide-react';
 import { initials } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
@@ -18,7 +13,7 @@ import { useTheme } from '../../lib/theme';
 function rutasDelTabBar(esClientePuro: boolean): Set<string> {
   return new Set(
     esClientePuro
-      ? ['/dashboard', '/mi-moto', '/combustible', '/puntos']
+      ? ['/dashboard', '/mi-moto']
       : ['/dashboard', '/registros', '/motos', '/inventario'],
   );
 }
@@ -26,26 +21,26 @@ function rutasDelTabBar(esClientePuro: boolean): Set<string> {
 interface NavItem { label: string; to: string }
 
 const ICONS: Record<string, LucideIcon> = {
-  'Dashboard': LayoutDashboard, 'Registros': Wrench, 'Motos': Bike,
+  'Dashboard': LayoutDashboard, 'Registros': Wrench, 'Vehículos': Car,
   'Inventario': Package, 'Proveedores': Truck, 'Clientes': UserCheck,
   'Pagos': CreditCard, 'Contabilidad': Wallet, 'Perfiles': Users,
-  'Mi Moto': Bike, 'Mi Portal': Globe, 'Puntos': Star, 'Alertas': Bell,
+  'Mis vehículos': Car, 'Mi Portal': Globe,
   'Diagnóstico': ClipboardList, 'Metodología': BookOpen, 'Combustible': Fuel,
 };
 const COLORS: Record<string, string> = {
-  'Dashboard': '#3B82F6', 'Registros': '#E11428', 'Motos': '#3B82F6',
+  'Dashboard': '#3B82F6', 'Registros': '#E11428', 'Vehículos': '#3B82F6',
   'Inventario': '#F59E0B', 'Proveedores': '#14B8A6', 'Clientes': '#10B981',
   'Pagos': '#8B5CF6', 'Contabilidad': '#10B981', 'Perfiles': '#8B5CF6',
-  'Mi Moto': '#3B82F6', 'Mi Portal': '#10B981', 'Puntos': '#F59E0B',
+  'Mis vehículos': '#3B82F6', 'Mi Portal': '#10B981',
   'Alertas': '#E11428', 'Diagnóstico': '#F59E0B', 'Metodología': '#14B8A6',
   'Combustible': '#8B5CF6',
 };
 
 /* Orden lógico por grupos */
 const GROUPS: { title: string; labels: string[] }[] = [
-  { title: 'Operación',           labels: ['Dashboard', 'Registros', 'Motos', 'Diagnóstico', 'Alertas', 'Metodología'] },
+  { title: 'Operación',           labels: ['Dashboard', 'Registros', 'Vehículos', 'Diagnóstico'] },
   { title: 'Inventario y compras', labels: ['Inventario', 'Proveedores'] },
-  { title: 'Clientes',            labels: ['Clientes', 'Mi Moto', 'Mi Portal', 'Combustible', 'Puntos'] },
+  { title: 'Clientes',            labels: ['Clientes', 'Mis vehículos', 'Mi Portal'] },
   { title: 'Finanzas',            labels: ['Pagos', 'Contabilidad'] },
   { title: 'Administración',      labels: ['Perfiles'] },
 ];
@@ -65,7 +60,6 @@ export default function MobileMore({
   const nav = useNavigate();
   const loc = useLocation();
   const { isAdmin, isMecanico } = useAuth();
-  const [theme, toggleTheme] = useTheme();
   if (!open) return null;
 
   /* Quitar lo que ya aparece en el tab bar inferior (sin redundancia) */
@@ -123,16 +117,6 @@ export default function MobileMore({
         {/* Cuenta */}
         <div className="m-more-group">
           <p className="m-more-gt">Cuenta</p>
-          {/* Modo claro / oscuro */}
-          <button onClick={toggleTheme} className="m-more-row">
-            <div className="m-more-ico" style={{ background: theme === 'dark' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)', border: theme === 'dark' ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(59,130,246,0.25)' }}>
-              {theme === 'dark' ? <Sun size={16} style={{ color: '#F59E0B' }} /> : <Moon size={16} style={{ color: '#3B82F6' }} />}
-            </div>
-            <span className="m-more-row-lbl">{theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(125,125,135,0.9)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              {theme === 'dark' ? 'Oscuro' : 'Claro'}
-            </span>
-          </button>
           <button onClick={onLogout} className="m-more-row">
             <div className="m-more-ico" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
               <LogOut size={16} style={{ color: '#EF4444' }} />

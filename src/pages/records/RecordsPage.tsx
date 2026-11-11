@@ -1,3 +1,4 @@
+import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
    Open Motors — Registros de Servicio
    5 estados · Nueva Orden · Historial cliente
@@ -186,7 +187,6 @@ export default function RecordsPage() {
   const [qDireccion,    setQDireccion]    = useState('');
   const [qMarca,        setQMarca]        = useState('');
   const [qModelo,       setQModelo]       = useState('');
-  const [qCc,           setQCc]           = useState('');
   const [qTipoMoto,     setQTipoMoto]     = useState('Otro');
   const [nMotoServicios, setNMotoServicios] = useState<Record<string, number>>({});
 
@@ -319,7 +319,7 @@ export default function RecordsPage() {
     setNFecha(isoDateOffset()); setNFechaEntrega(isoDateOffset(1));
     setPlateQuery(''); setShowQuick(false);
     setQNombre(''); setQCorreo(''); setQTelefono(''); setQCedula(''); setQDireccion('');
-    setQMarca(''); setQModelo(''); setQCc(''); setQTipoMoto('Otro');
+    setQMarca(''); setQModelo(''); setQTipoMoto('Otro');
   };
 
   const togglePartes = (parte: string) =>
@@ -347,8 +347,8 @@ export default function RecordsPage() {
 
   /* Crear cliente + moto al instante (cliente sin tiempo) */
   const crearRapido = async () => {
-    if (!plateQuery.trim() || !qNombre.trim() || !qMarca.trim() || !qModelo.trim() || !qCc || !qTelefono.trim() || !qCedula.trim() || !qDireccion.trim()) {
-      toast.error('Nombre, Cédula, Teléfono, Dirección, Placa, Marca, Modelo y Cilindraje son obligatorios');
+    if (!plateQuery.trim() || !qNombre.trim() || !qMarca.trim() || !qModelo.trim() || !qTelefono.trim() || !qCedula.trim() || !qDireccion.trim()) {
+      toast.error('Nombre, Cédula, Teléfono, Dirección, Placa, Marca y Modelo son obligatorios');
       return;
     }
     setCreatingQuick(true);
@@ -386,12 +386,11 @@ export default function RecordsPage() {
         modelo:      qModelo.trim(),
         anio:        new Date().getFullYear(),
         tipo_moto:   qTipoMoto,
-        cilindraje:  parseInt(qCc, 10),
         kilometraje: 0,
         id_usuario:  nuevo.id_usuario,
       });
 
-      toast.success('Cliente y moto creados — el cliente puede completar sus datos luego');
+      toast.success('Cliente y vehículo creados — el cliente puede completar sus datos luego');
       // Refrescar listas y seleccionar
       const [uRes, mRes] = await Promise.allSettled([usuariosApi.list(), motosApi.list()]);
       if (uRes.status === 'fulfilled') setUsuarios(uRes.value.data as Usuario[]);
@@ -407,7 +406,7 @@ export default function RecordsPage() {
 
   const createOrder = async () => {
     if (!nMoto || !nKm || !me) {
-      toast.error('Selecciona una moto (por placa) e ingresa el kilometraje');
+      toast.error('Selecciona un vehículo (por placa) e ingresa el kilometraje');
       return;
     }
     if (!nFecha || (nFechaEntrega && nFechaEntrega < nFecha)) {
@@ -417,7 +416,7 @@ export default function RecordsPage() {
     const cliente = nCliente ?? usuarios.find(u => u.id_usuario === nMoto.id_usuario);
     const tipo    = nTipo ?? tipoPorDefecto();
     if (!cliente || !tipo) {
-      toast.error('Falta el propietario de la moto o no hay tipos de servicio configurados');
+      toast.error('Falta el propietario del vehículo o no hay tipos de servicio configurados');
       return;
     }
     setCreatingOrder(true);
@@ -681,7 +680,7 @@ export default function RecordsPage() {
       ${descRows ? `
       <div class="sec-header desc">
         <div class="sec-icon desc"></div>
-        <span class="sec-label desc">Descuento por puntos</span>
+        <span class="sec-label desc">Descuento histórico</span>
         <span class="sec-sub desc">${fmtMoney(descTotal)}</span>
       </div>
       <table><thead><tr><th>DescripciÃ³n</th><th class="num">Cant.</th><th class="num">Valor</th><th class="num">Subtotal</th></tr></thead>
@@ -767,11 +766,11 @@ export default function RecordsPage() {
       .summary{display:flex;justify-content:space-between;margin-top:22px;padding:18px;background:#172033;color:#fff}.summary b{font-size:24px}.recommend{margin-top:14px;padding:14px;border-left:4px solid #f59e0b;background:#fffbeb;font-size:13px}
       @media print{body{background:#fff;padding:0}main{max-width:none;padding:18px}.no-print{display:none}}
     </style></head><body><main>
-      <h1>Historial general de motocicletas</h1><p class="sub">Open Motors · Emitido ${fmtDate(isoDateOffset())}</p>
+      <h1>Historial general de vehículos</h1><p class="sub">Open Motors · Emitido ${fmtDate(isoDateOffset())}</p>
       <div class="client"><span><b>Cliente:</b> ${historyName}</span><span><b>CI/RUC:</b> ${cedula}</span><span><b>Telefono:</b> ${telefono}</span><span><b>Correo:</b> ${correo}</span><span style="grid-column:1/-1"><b>Direccion:</b> ${direccion}</span></div>
       ${rows}
       <div class="summary"><span>${clientHistory.length} servicios registrados</span><b>${fmtMoney(total)}</b></div>
-      ${latestKm > 0 ? `<div class="recommend"><b>Seguimiento recomendado:</b> revisar el plan de mantenimiento al llegar aproximadamente a ${(latestKm + 1000).toLocaleString('es-EC')} km, ajustandolo segun el manual de la motocicleta.</div>` : ''}
+      ${latestKm > 0 ? `<div class="recommend"><b>Seguimiento recomendado:</b> revisar el plan de mantenimiento al llegar aproximadamente a ${(latestKm + 1000).toLocaleString('es-EC')} km, ajustandolo segun el manual del vehículo.</div>` : ''}
     </main></body></html>`);
     w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
   };
@@ -1089,7 +1088,7 @@ export default function RecordsPage() {
           {!nMoto ? (
             <div>
               <label className="text-xs font-semibold dark:text-white/50 text-slate-900/50 uppercase tracking-wider block mb-1.5">
-                1 · Placa de la moto <span className="text-gm-red">*</span>
+                1 · Placa del vehículo <span className="text-gm-red">*</span>
                 <span className="dark:text-white/25 text-slate-900/25 normal-case font-normal ml-2">lo principal — busca o registra al instante</span>
               </label>
               <div className="relative">
@@ -1119,7 +1118,7 @@ export default function RecordsPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold dark:text-white/85 text-slate-900/85 truncate">{m.marca} {m.modelo}</p>
                             <p className="text-[11px] dark:text-white/35 text-slate-900/35 truncate">
-                              {m.cilindraje}cc · {owner?.nombre_completo ?? 'Sin propietario'}
+                              {owner?.nombre_completo ?? 'Sin propietario'}
                             </p>
                           </div>
                           <ChevronRight size={15} className="dark:text-white/25 text-slate-900/25 shrink-0" />
@@ -1129,7 +1128,7 @@ export default function RecordsPage() {
                   ) : (
                     <div className="p-3 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02]">
                       <p className="text-[12px] dark:text-white/40 text-slate-900/40 mb-2">
-                        No existe ninguna moto con placa <strong className="dark:text-white/70 text-slate-900/70">{plateQuery.toUpperCase()}</strong>.
+                        No existe ningún vehículo con placa <strong className="dark:text-white/70 text-slate-900/70">{plateQuery.toUpperCase()}</strong>.
                       </p>
                       <button
                         type="button"
@@ -1137,7 +1136,7 @@ export default function RecordsPage() {
                         className="flex items-center gap-2 text-[12px] font-bold px-3 py-2 rounded-lg"
                         style={{ background: 'rgba(225,20,40,0.12)', border: '1px solid rgba(225,20,40,0.35)', color: '#FF6470' }}
                       >
-                        <UserPlus size={13} /> Registrar moto y cliente al instante
+                        <UserPlus size={13} /> Registrar vehículo y cliente al instante
                       </button>
                     </div>
                   )}
@@ -1151,7 +1150,7 @@ export default function RecordsPage() {
                     <Zap size={13} /> Registro rápido — placa {plateQuery.toUpperCase()}
                   </p>
                   <p className="text-[11px] dark:text-white/40 text-slate-900/40 -mt-1">
-                    Crea la moto y un cliente básico ahora. El cliente podrá completar sus datos después con calma.
+                    Crea el vehículo y un cliente básico ahora. El cliente podrá completar sus datos después con calma.
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <input className="gm-input-d" placeholder="Nombre completo *" value={qNombre} onChange={e => setQNombre(e.target.value)} />
@@ -1166,13 +1165,12 @@ export default function RecordsPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-3">
                     <select className="gm-select-d" value={qTipoMoto} onChange={e => setQTipoMoto(e.target.value)}>
-                      {['Sport','Naked','Touring','Enduro','Scrambler','Cruiser','Scooter','Otro'].map(t => <option key={t} value={t}>{t}</option>)}
+                      {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     <input className="gm-input-d" placeholder="Marca *" value={qMarca} onChange={e => setQMarca(e.target.value)} />
                     <input className="gm-input-d" placeholder="Modelo *" value={qModelo} onChange={e => setQModelo(e.target.value)} />
-                    <input className="gm-input-d" type="number" placeholder="Cilindraje *" value={qCc} onChange={e => setQCc(e.target.value)} />
                   </div>
                   <div className="flex justify-end gap-2">
                     <button type="button" onClick={() => setShowQuick(false)}
@@ -1196,7 +1194,7 @@ export default function RecordsPage() {
             <div className="flex items-center gap-3 p-3 rounded-xl bg-gm-red/[0.07] border border-gm-red/25">
               <span className="plate-tag text-[12px]">{nMoto.placa}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold dark:text-white/90 text-slate-900/90 truncate">{nMoto.marca} {nMoto.modelo} · {nMoto.cilindraje}cc</p>
+                <p className="text-sm font-bold dark:text-white/90 text-slate-900/90 truncate">{nMoto.marca} {nMoto.modelo}</p>
                 <p className="text-[11px] dark:text-white/40 text-slate-900/40 flex items-center gap-2">
                   <span>{nCliente?.nombre_completo ?? 'Sin propietario'}</span>
                   {isAdmin && clientPhone && <span className="flex items-center gap-1"><Phone size={9} /> {clientPhone}</span>}
@@ -1213,7 +1211,7 @@ export default function RecordsPage() {
           {nMoto && recomendaciones.length > 0 && (
             <div className="p-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
               <p className="flex items-center gap-2 text-[12px] font-bold text-amber-300 mb-2">
-                <AlertTriangle size={13} /> Recomendado para esta moto ({nMoto.kilometraje.toLocaleString('es-EC')} km)
+                <AlertTriangle size={13} /> Recomendado para este vehículo ({nMoto.kilometraje.toLocaleString('es-EC')} km)
               </p>
               <div className="flex flex-wrap gap-2">
                 {recomendaciones.map(r => {
@@ -1308,7 +1306,7 @@ export default function RecordsPage() {
           <div>
             <label className="text-xs font-semibold dark:text-white/50 text-slate-900/50 uppercase tracking-wider block mb-1.5">
               6 · Kilometraje actual <span className="text-gm-red">*</span>
-              {nMoto && <span className="dark:text-white/25 text-slate-900/25 normal-case font-normal ml-2">(moto registrada: {nMoto.kilometraje.toLocaleString('es-EC')} km)</span>}
+              {nMoto && <span className="dark:text-white/25 text-slate-900/25 normal-case font-normal ml-2">(vehículo registrado: {nMoto.kilometraje.toLocaleString('es-EC')} km)</span>}
             </label>
             <div className="relative">
               <Gauge size={13} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/25 text-slate-900/25 pointer-events-none" />

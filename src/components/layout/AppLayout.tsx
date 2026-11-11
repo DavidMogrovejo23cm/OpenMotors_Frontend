@@ -21,7 +21,6 @@ import { isNativeApp } from '../../lib/platform';
 import MobileTabBar from '../mobile/MobileTabBar';
 import MobileMore from '../mobile/MobileMore';
 import { useTheme } from '../../lib/theme';
-import { Sun, Moon } from 'lucide-react';
 import Sidebar from './Sidebar';
 import { whatsappCitaLink } from '../../lib/constants';
 
@@ -31,7 +30,7 @@ export default function AppLayout() {
   const navigate  = useNavigate();
   const toast      = useToast();
   const { unread } = useNotifications();
-  const [theme, toggleTheme] = useTheme();
+  const [theme] = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   /* Cambiar/crear contraseña */
@@ -110,23 +109,17 @@ export default function AppLayout() {
   const NAV = [
     { label: 'Dashboard',    to: '/dashboard'    },
     ...(puede('registros')   && (isAdmin || isMecanico) ? [{ label: 'Registros',   to: '/registros'   }] : []),
-    ...(puede('motos')       && (isAdmin || isMecanico) ? [{ label: 'Motos',       to: '/motos'       }] : []),
+    ...(puede('motos')       && (isAdmin || isMecanico) ? [{ label: 'Vehículos',       to: '/motos'       }] : []),
     ...(puede('inventario')  && (isAdmin || isMecanico) ? [{ label: 'Inventario',  to: '/inventario'  }] : []),
     ...(puede('proveedores') && (isAdmin || isMecanico) ? [{ label: 'Proveedores', to: '/proveedores' }] : []),
     ...(puede('clientes')    && (isAdmin || isMecanico) ? [{ label: 'Clientes',    to: '/clientes'    }] : []),
     ...(isAdmin                                         ? [{ label: 'Pagos',       to: '/pagos'       }] : []),
-    ...(verCliente                                      ? [{ label: 'Mi Moto',     to: '/mi-moto'     }] : []),
+    ...(verCliente                                      ? [{ label: 'Mis vehículos',     to: '/mi-moto'     }] : []),
     ...(verCliente                                      ? [{ label: 'Mi Portal',   to: '/portal'      }] : []),
-    ...(verCliente                                      ? [{ label: 'Puntos',      to: '/puntos'      }] : []),
   ];
 
   /* Menú "Más" — secundarios, no saturan la barra principal */
   const NAV_MORE = [
-    ...(puede('alertas')     && (isAdmin || isMecanico) ? [{ label: 'Alertas',       to: '/alertas'       }] : []),
-    ...(puede('metodologia') && (isAdmin || isMecanico) ? [{ label: 'Metodología',  to: '/metodologia'   }] : []),
-    ...(puede('puntos')      && (isAdmin || isMecanico) ? [{ label: 'Puntos',       to: '/puntos'        }] : []),
-    ...(puede('combustible') && (isAdmin || isMecanico) ? [{ label: 'Combustible',  to: '/combustible'   }] : []),
-    ...(verCliente                                      ? [{ label: 'Combustible',  to: '/combustible'   }] : []),
     ...(isAdmin                                         ? [{ label: 'Contabilidad', to: '/contabilidad'  }] : []),
     ...(isAdmin                                         ? [{ label: 'Perfiles',     to: '/perfiles'      }] : []),
   ];
@@ -433,18 +426,6 @@ export default function AppLayout() {
                   Instalar
                 </button>
               )}
-            {/* Toggle de tema claro / oscuro */}
-            <button
-              onClick={toggleTheme}
-              className="flex items-center justify-center w-9 h-9 rounded-xl transition-all shrink-0"
-              style={{ background: topBtnBg, border: `1px solid ${topBtnBdr}` }}
-              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              aria-label="Cambiar tema"
-            >
-              {theme === 'dark'
-                ? <Sun size={16} style={{ color: '#F59E0B' }} />
-                : <Moon size={16} style={{ color: '#3B82F6' }} />}
-            </button>
             {/* Bell de notificaciones */}
             <div className="relative" ref={notifRef}>
               <NotificationBell onClick={() => setNotifOpen(v => !v)} unread={unread} />

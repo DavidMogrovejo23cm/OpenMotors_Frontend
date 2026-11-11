@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Bike, Gauge, Calendar, User,
+  ArrowLeft, Car, Gauge, Calendar, User,
   ClipboardList, Plus, Clock, CheckCircle, AlertTriangle,
   XCircle, ChevronDown, ChevronUp, Cog, Link2, Shield,
   Circle, ArrowUpDown, Droplets, Zap, Activity, type LucideIcon,
@@ -21,15 +21,6 @@ import { imagenMoto } from '../../lib/fotos';
 import { useTheme } from '../../lib/theme';
 
 /* ── Constantes ── */
-const CC_RANGES = [
-  { max: 125,      label: 'Urbana',            color: '#10B981' },
-  { max: 200,      label: 'Semideportiva',     color: '#3B82F6' },
-  { max: 400,      label: 'Deportiva',         color: '#F59E0B' },
-  { max: 650,      label: 'Alto rendimiento',  color: '#FF8C00' },
-  { max: Infinity, label: 'Supersport',        color: '#E11428' },
-];
-const getCCRange = (cc: number) => CC_RANGES.find(r => cc <= r.max) ?? CC_RANGES[CC_RANGES.length - 1];
-
 const TIPO_COLOR: Record<string, string> = {
   Sport: '#FF3B47', Naked: '#FF8C00', Touring: '#00C9FF', Enduro: '#00E676',
   Scrambler: '#D4A017', Cruiser: '#BF5FFF', Scooter: '#29D9C2', Otro: '#8A8A9E',
@@ -38,7 +29,7 @@ const getTipoColor = (t: string) => TIPO_COLOR[t] ?? '#8A8A9E';
 
 const PARTES_ICON: Record<string, LucideIcon> = {
   MOTOR: Cog, TRANSMISION: Link2, FRENOS: Shield, LLANTAS: Circle,
-  SUSPENSION: ArrowUpDown, ELECTRICO: Zap, CARROCERIA: Bike, REFRIGERACION: Droplets,
+  SUSPENSION: ArrowUpDown, ELECTRICO: Zap, CARROCERIA: Car, REFRIGERACION: Droplets,
 };
 const PARTES_LABEL: Record<string, string> = {
   MOTOR: 'Motor', TRANSMISION: 'Transmisión', FRENOS: 'Frenos', LLANTAS: 'Llantas',
@@ -158,7 +149,7 @@ export default function MotoPerfilPage() {
       motosApi.get(motoId),
       usuariosApi.list(),
     ]).then(([m, u]) => {
-      if (m.status === 'rejected') { setError('Moto no encontrada'); setLoading(false); return; }
+      if (m.status === 'rejected') { setError('Vehículo no encontrado'); setLoading(false); return; }
       const motoData = m.value.data as Moto;
       setMoto(motoData);
 
@@ -214,16 +205,15 @@ export default function MotoPerfilPage() {
   if (error || !moto) {
     return (
       <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center', padding: '60px 20px' }}>
-        <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.6)', fontSize: 15 }}>{error || 'Moto no encontrada'}</p>
+        <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.6)', fontSize: 15 }}>{error || 'Vehículo no encontrado'}</p>
         <button onClick={() => navigate('/motos')} style={{ marginTop: 18, fontSize: 13, color: '#3B82F6', background: 'none', border: 'none', cursor: 'pointer' }}>
-          Volver a motos
+          Volver a vehículos
         </button>
       </div>
     );
   }
 
   const tc       = getTipoColor(moto.tipo_moto);
-  const ccRange  = getCCRange(moto.cilindraje);
   const anioActual = new Date().getFullYear();
   const antiguedad = anioActual - moto.anio;
 
@@ -248,7 +238,7 @@ export default function MotoPerfilPage() {
         onMouseEnter={e => (e.currentTarget.style.color = isDark ? '#EBEBEB' : '#15151B')}
         onMouseLeave={e => (e.currentTarget.style.color = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.6)')}
       >
-        <ArrowLeft size={14} /> Volver a motos
+        <ArrowLeft size={14} /> Volver a vehículos
       </button>
 
       {/* ── Hero: foto + info principal ── */}
@@ -265,7 +255,7 @@ export default function MotoPerfilPage() {
           </div>
         ) : (
           <div style={{ width: '100%', height: 120, background: `linear-gradient(135deg, ${tc}18, ${tc}08)`, borderBottom: `1px solid ${tc}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Bike size={48} color={`${tc}40`} />
+            <Car size={48} color={`${tc}40`} />
           </div>
         )}
 
@@ -311,7 +301,6 @@ export default function MotoPerfilPage() {
           {/* Stats */}
           <div style={{ display: 'flex', gap: 0, marginTop: 18, background: cbg, border: `1px solid ${cbd}`, borderRadius: 12, overflow: 'hidden' }}>
             {[
-              { icon: <Gauge size={13} />,    val: `${moto.cilindraje} cc`, lbl: 'Cilindraje' },
               { icon: <Zap size={13} />,      val: moto.kilometraje.toLocaleString('es-CO'), lbl: 'Kilómetros' },
               { icon: <Calendar size={13} />, val: moto.anio, lbl: antiguedad === 0 ? 'Nuevo' : `${antiguedad} años` },
             ].map((st, i) => (
@@ -324,15 +313,6 @@ export default function MotoPerfilPage() {
           </div>
 
           {/* CC range badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase',
-              color: ccRange.color, background: `${ccRange.color}15`,
-              border: `1px solid ${ccRange.color}30`, borderRadius: 99, padding: '3px 10px',
-            }}>
-              {moto.cilindraje} cc — {ccRange.label}
-            </span>
-          </div>
         </div>
       </div>
 
@@ -410,7 +390,7 @@ export default function MotoPerfilPage() {
         {/* Línea de tiempo */}
         {servicios.length === 0 ? (
           <p style={{ color: cs, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
-            Aún no hay servicios registrados para esta moto
+            Aún no hay servicios registrados para este vehículo
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -478,8 +458,8 @@ export default function MotoPerfilPage() {
             </p>
             <p style={{ color: cm, fontSize: 12, margin: '0 0 18px' }}>
               {canManage
-                ? 'Crea el primer diagnóstico para esta moto.'
-                : 'El taller aún no ha registrado un diagnóstico para tu moto.'
+                ? 'Crea el primer diagnóstico para este vehículo.'
+                : 'El taller aún no ha registrado un diagnóstico para tu vehículo.'
               }
             </p>
             {canManage && (

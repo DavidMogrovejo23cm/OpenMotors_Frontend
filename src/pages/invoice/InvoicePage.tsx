@@ -420,7 +420,7 @@ export default function InvoicePage() {
                     <td className="px-3 py-3 text-sm text-gray-500 font-mono text-center">{d.cantidad ?? 1}</td>
                     <td className="px-3 py-3">
                       <p className="text-sm font-bold text-gray-800">{cleanDescripcion(d.descripcion) || "Detalle"}</p>
-                      {isDesc && <p className="text-[10px] text-emerald-500 mt-0.5 font-semibold">Descuento por puntos</p>}
+                      {isDesc && <p className="text-[10px] text-emerald-500 mt-0.5 font-semibold">Descuento histórico</p>}
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-500 text-right">{fmtMoney(Number(d.precioUnitario ?? 0))}</td>
                     <td className={`px-3 py-3 text-sm font-black text-right ${isDesc ? "text-emerald-700" : "text-gray-800"}`}>{fmtMoney(Number(d.subtotal ?? 0))}</td>
@@ -485,7 +485,7 @@ export default function InvoicePage() {
                          style={{ background: '#ECFDF5', border: '1px solid #BBF7D0' }}>
                       <span className="text-xs text-emerald-700 font-semibold flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#10B981', flexShrink: 0 }} />
-                        Descuento puntos
+                        Descuento histórico
                       </span>
                       <span className="font-black text-emerald-800 text-sm">{fmtMoney(totalDesc)}</span>
                     </div>
