@@ -38,6 +38,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
+            aria-invalid={error ? true : undefined}
             type={inputType}
             className={cn(
               'gm-input-d w-full h-11 pl-[14px]',   // padding-left base

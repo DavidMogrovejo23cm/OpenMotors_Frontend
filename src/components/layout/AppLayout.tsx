@@ -28,6 +28,12 @@ export default function AppLayout() {
   const { user, isAdmin, isMecanico, isCliente, logout } = useAuth();
   const location  = useLocation();
   const navigate  = useNavigate();
+  const lastNonClientRoute = useRef("/dashboard");
+  useEffect(() => {
+    if (location.pathname !== "/clientes") {
+      lastNonClientRoute.current = location.pathname + location.search + location.hash;
+    }
+  }, [location.pathname, location.search, location.hash]);
   const toast      = useToast();
   const { unread } = useNotifications();
   const [theme] = useTheme();
@@ -93,7 +99,6 @@ export default function AppLayout() {
   const topTextHi = isDark ? 'rgba(255,255,255,0.80)'  : 'rgba(22,22,26,0.90)';
   const topBtnBg  = isDark ? 'rgba(255,255,255,0.05)'  : 'rgba(0,0,0,0.05)';
   const topBtnBdr = isDark ? 'rgba(255,255,255,0.08)'  : 'rgba(0,0,0,0.10)';
-  const topBrand  = isDark ? '#ffffff'                 : '#16161A';
 
   /* Permisos de módulos (mecánicos): null = sin restricción, array = lista permitida */
   const mecPermisos = isMecanico ? parsePermisos(user?.descripcion) : null;
@@ -334,7 +339,7 @@ export default function AppLayout() {
           </button>
 
           {/* Topbar Brand & Toggle */}
-          <Link to="/dashboard" className="flex items-center gap-3 shrink-0 group">
+          <Link to="/dashboard" className="gallery-brand flex items-center gap-2 min-w-0">
             <div
               className="relative shrink-0 overflow-hidden bg-white p-0.5"
               style={{
@@ -345,15 +350,7 @@ export default function AppLayout() {
             >
               <img src="/brand/open-motor-logo.png" alt="Open Motors" className="w-full h-full object-contain" />
             </div>
-            <div style={{ lineHeight: 1 }}>
-              <div className="flex items-center gap-1 font-black text-[20px] sm:text-[24px] tracking-tight">
-                <span className="text-blue-900 dark:text-blue-400">OPEN</span>
-                <span className="text-[#C41E3A]">MOTOR</span>
-              </div>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
-                Servicio Automotriz
-              </p>
-            </div>
+            <span className="truncate">Open Motors</span>
           </Link>
 
           {/* Divisor desktop */}
@@ -552,7 +549,7 @@ export default function AppLayout() {
         />
 
         {/* ══ CONTENIDO DE CADA PÁGINA ════════════════════════════════ */}
-        <main className="flex-1 overflow-y-auto min-h-[calc(100vh-62px)]">
+        <main className="gallery-content flex-1 min-w-0 overflow-y-auto min-h-[calc(100vh-62px)]">
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 8 }}
@@ -564,7 +561,7 @@ export default function AppLayout() {
             {/* Boundary por página: si una pantalla falla, el menú sigue vivo
                 y al navegar a otra ruta (resetKey) se recupera sola. */}
             <ErrorBoundary resetKey={location.pathname}>
-              <Outlet />
+              <Outlet context={lastNonClientRoute.current} />
             </ErrorBoundary>
           </motion.div>
         </main>

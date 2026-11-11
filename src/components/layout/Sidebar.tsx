@@ -60,7 +60,7 @@ export default function Sidebar({ collapsed = false, onToggleCollapse }: Sidebar
   return (
     <aside
       className={cn(
-        "hidden md:flex flex-col flex-shrink-0 transition-all duration-300 z-40",
+        "gallery-sidebar hidden md:flex flex-col flex-shrink-0 transition-all duration-300 z-40",
         "bg-white dark:bg-[#0E131F] border-r border-slate-200 dark:border-slate-800/80 shadow-sm",
         collapsed ? "w-20" : "w-64"
       )}

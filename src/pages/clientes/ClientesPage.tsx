@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import type { LucideIcon } from 'lucide-react';
 import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
@@ -5,8 +6,9 @@ import { VEHICLE_TYPES } from '../../lib/constants';
    Historial de servicios, vehículos y compras
    ───────────────────────────────────────────── */
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Search, Users, Phone, MapPin, Mail, Lock, Unlock, ChevronRight, Wrench, Shield, ArrowLeft, CreditCard, TrendingUp, Calendar, Car, Activity, CheckCircle, Clock, Package, ChevronDown, ChevronUp, Gauge, Send } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Search, Users, Phone, MapPin, Mail, Lock, Unlock, ChevronRight, Wrench, Shield, ArrowLeft, CreditCard, TrendingUp, Calendar, Car, Activity, CheckCircle, Clock, Package, ChevronDown, ChevronUp, Gauge, Send, CircleAlert } from 'lucide-react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { safeFromTo } from '../../hooks/useGsap';
 import {
   usuariosApi, registrosApi, motosApi,
@@ -626,10 +628,16 @@ export default function ClientesPage() {
   const [pendingSelect, setPendingSelect]  = useState<Usuario | null>(null);
 
   // Re-auth modal state for the entire page
+  const navigate = useNavigate();
+  const previousRoute = useOutletContext<string | undefined>();
+  const verificationAttempt = useRef(0);
+  useEffect(() => () => { verificationAttempt.current += 1; }, []);
+
   const [pageUnlocked, setPageUnlocked] = useState(false);
   const [reAuthOpen,    setReAuthOpen]    = useState(false);
   const [reAuthPwd,     setReAuthPwd]     = useState('');
   const [reAuthLoading, setReAuthLoading] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
 
   /* Ofertas / email masivo */
   const [ofertaOpen,    setOfertaOpen]    = useState(false);
@@ -772,14 +780,18 @@ export default function ClientesPage() {
   const openReAuth = (_client: Usuario | null, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setReAuthPwd('');
+    setVerificationError('');
     setReAuthOpen(true);
   };
 
   const verifyPassword = async () => {
-    if (!me) return;
+    if (!me || reAuthLoading || !reAuthPwd.trim()) return;
+    const attempt = ++verificationAttempt.current;
+    setVerificationError('');
     setReAuthLoading(true);
     try {
       await authApi.login(me.correo, reAuthPwd);
+      if (verificationAttempt.current !== attempt) return;
       toast.success('Identidad verificada');
       setReAuthOpen(false);
       setReAuthPwd('');
@@ -790,9 +802,26 @@ export default function ClientesPage() {
         setSelected(pendingSelect);
         setPendingSelect(null);
       }
-    } catch {
-      toast.error('Contraseña incorrecta');
-    } finally { setReAuthLoading(false); }
+    } catch (error) {
+      if (verificationAttempt.current === attempt) {
+        const status = isAxiosError(error) ? error.response?.status : undefined;
+        setVerificationError(status === 401 || status === 403
+          ? 'Contraseña incorrecta. Inténtalo de nuevo.'
+          : 'No pudimos verificar tu contraseña. Inténtalo de nuevo.');
+      }
+    } finally {
+      if (verificationAttempt.current === attempt) setReAuthLoading(false);
+    }
+  };
+
+  const cancelVerification = () => {
+    verificationAttempt.current += 1;
+    setReAuthOpen(false);
+    setReAuthPwd('');
+    setReAuthLoading(false);
+    setVerificationError('');
+    setPendingSelect(null);
+    if (!pageUnlocked) navigate(previousRoute ?? '/dashboard', { replace: true });
   };
 
   /* ── RENDER ── */
@@ -908,54 +937,45 @@ export default function ClientesPage() {
         </>
       )}
 
-      {/* Modal re-autenticación */}
       <Modal
         open={reAuthOpen}
-        onClose={() => { if (pageUnlocked) { setReAuthOpen(false); setReAuthPwd(''); } }}
-        title="Verificación de identidad"
+        onClose={cancelVerification}
+        title="Confirma tu identidad"
         size="sm"
-        footer={
-          <>
-            {pageUnlocked && (
-              <Button variant="secondary" onClick={() => { setReAuthOpen(false); setReAuthPwd(''); }}>
-                Cancelar
-              </Button>
-            )}
-            <Button onClick={verifyPassword} loading={reAuthLoading} disabled={!reAuthPwd.trim()}>
-              <Shield size={14} /> Confirmar identidad
-            </Button>
-          </>
-        }
+        portal
       >
-        <div className="space-y-4">
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-gm-red/[0.07] border border-gm-red/20">
-            <Shield size={20} className="text-gm-red shrink-0 mt-0.5" />
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.2em] font-black text-gm-red mb-1">
-                Datos protegidos
-              </p>
-              <p className="text-[12px] dark:text-white/45 text-slate-900/45 leading-relaxed">
-                Para ingresar al panel de gestión de clientes,{' '}
-                confirma tu contraseña de administrador.
-              </p>
-            </div>
+        <form className="space-y-4" onSubmit={e => { e.preventDefault(); void verifyPassword(); }}>
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--om-alert)] text-[var(--om-hover)]">
+              <Shield size={19} aria-hidden="true" />
+            </span>
+            <p className="text-sm leading-relaxed text-[var(--om-muted)]">
+              Ingresa tu contraseña para ver los datos de clientes.
+            </p>
           </div>
-
           <Input
-            label="Tu contraseña"
+            label="Contraseña"
             type="password"
-            placeholder="••••••••"
+            autoComplete="current-password"
             value={reAuthPwd}
-            onChange={e => setReAuthPwd(e.target.value)}
-            onKeyDown={e => { if (e.key==='Enter' && reAuthPwd.trim() && !reAuthLoading) verifyPassword(); }}
+            aria-invalid={Boolean(verificationError)}
+            aria-describedby={verificationError ? 'client-verification-error' : undefined}
+            onChange={e => { setReAuthPwd(e.target.value); setVerificationError(''); }}
             autoFocus
           />
-
-          <p className="text-[11px] dark:text-white/20 text-slate-900/20 flex items-center gap-1.5">
-            <Lock size={9} />
-            El desbloqueo dura toda la sesión — no tendrás que volver a verificar
-          </p>
-        </div>
+          {verificationError && (
+            <p id="client-verification-error" role="alert" className="verification-feedback flex items-start gap-2 rounded-lg px-3 py-2 text-sm">
+              <CircleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+              {verificationError}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
+            <Button type="button" variant="secondary" onClick={cancelVerification}>Cancelar</Button>
+            <Button type="submit" loading={reAuthLoading} disabled={!reAuthPwd.trim()}>
+              Verificar
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       {/* ── Modal: Enviar oferta por email ── */}

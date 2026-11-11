@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import gsap from 'gsap';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../lib/theme';
@@ -16,54 +17,51 @@ interface ModalProps {
   children: ReactNode;
   size?:    'sm' | 'md' | 'lg' | 'xl';
   footer?:  ReactNode;
+  portal?: boolean;
 }
 
 const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl' };
 
-export default function Modal({ open, onClose, title, children, size = 'md', footer }: ModalProps) {
+export default function Modal({ open, onClose, title, children, size = 'md', footer, portal = false }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const panelRef    = useRef<HTMLDivElement>(null);
   const [theme]     = useTheme();
   const isDark      = theme === 'dark';
 
   useEffect(() => {
-    if (!backdropRef.current || !panelRef.current) return;
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.2, overwrite: true });
-      gsap.fromTo(panelRef.current,
-        { opacity: 0, y: 28, scale: 0.95 },
-        { opacity: 1, y: 0,  scale: 1,    duration: 0.28, ease: 'power3.out', overwrite: true },
-      );
-    } else {
-      document.body.style.overflow = '';
-    }
+    const backdrop = backdropRef.current;
+    const panel = panelRef.current;
+    if (!open || !backdrop || !panel) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    gsap.fromTo(backdrop, { opacity: 0 }, { opacity: 1, duration: 0.2, overwrite: true });
+    gsap.fromTo(panel,
+      { opacity: 0, y: 28, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: 'power3.out', overwrite: true },
+    );
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      gsap.killTweensOf(backdrop);
+      gsap.killTweensOf(panel);
+    };
   }, [open]);
 
-  /* Salvaguarda: si el modal se desmonta estando abierto (ej. cambio de ruta),
-     liberar SIEMPRE el scroll del body y matar tweens para que la página no quede congelada. */
-  useEffect(() => {
-    return () => {
-      document.body.style.overflow = '';
-      if (backdropRef.current) gsap.killTweensOf(backdropRef.current);
-      if (panelRef.current)    gsap.killTweensOf(panelRef.current);
-    };
-  }, []);
-
   const handleClose = () => {
-    if (!backdropRef.current || !panelRef.current) { onClose(); return; }
+    if (portal || !backdropRef.current || !panelRef.current) { onClose(); return; }
     gsap.to(panelRef.current,    { opacity: 0, y: 14, scale: 0.96, duration: 0.15, overwrite: true });
     gsap.to(backdropRef.current, { opacity: 0, duration: 0.18, overwrite: true, onComplete: onClose });
   };
 
   if (!open) return null;
 
-  return (
+  const dialog = (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
+      className={cn("fixed inset-0 flex items-center justify-center p-4", portal ? "z-[200]" : "z-50")}
+      style={{ background: portal ? 'rgba(15,23,42,0.45)' : 'rgba(0,0,0,0.7)', backdropFilter: portal ? 'blur(4px)' : 'blur(8px)' }}
       onClick={(e) => e.target === backdropRef.current && handleClose()}
+      onKeyDown={(e) => { if (portal && e.key === "Escape") handleClose(); }}
     >
       <div
         ref={panelRef}
@@ -113,4 +111,5 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
       </div>
     </div>
   );
+  return portal ? createPortal(dialog, document.body) : dialog;
 }

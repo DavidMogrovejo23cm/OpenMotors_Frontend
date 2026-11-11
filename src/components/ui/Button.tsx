@@ -14,8 +14,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary:   'btn-red bg-gradient-to-br from-gm-red-lt via-gm-red to-gm-red-dk text-white shadow-lg shadow-gm-red/25 hover:shadow-xl hover:shadow-gm-red/40 active:scale-[0.98]',
-  secondary: 'bg-slate-900/[0.04] border border-slate-900/[0.12] text-slate-900/70 hover:border-slate-900/[0.22] hover:text-slate-900 hover:bg-slate-900/[0.07] dark:bg-white/[0.06] dark:border-white/[0.1] dark:text-white/70 dark:hover:border-white/[0.2] dark:hover:text-white/95 dark:hover:bg-white/[0.09] active:scale-[0.98]',
+  primary:   'bg-[var(--om-action)] !text-white hover:bg-[var(--om-hover)]',
+  secondary: 'border border-[var(--om-action)] bg-white text-[var(--om-action)] hover:bg-[var(--om-alert)] hover:text-[var(--om-hover)]',
   ghost:     'text-slate-900/45 hover:text-slate-900/80 hover:bg-slate-900/[0.04] dark:text-white/40 dark:hover:text-white/75 dark:hover:bg-white/[0.04] active:scale-[0.98]',
   danger:    'bg-gm-danger/90 text-white border border-gm-danger/20 hover:bg-gm-danger hover:shadow-lg hover:shadow-gm-danger/30 active:scale-[0.98]',
 };
@@ -33,10 +33,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          'inline-flex items-center justify-center font-medium rounded-xl',
+          'inline-flex items-center justify-center font-medium rounded-full',
           'transition-all duration-200 select-none',
           'disabled:opacity-50 disabled:cursor-not-allowed',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gm-red focus-visible:ring-offset-2',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--om-link)] focus-visible:ring-offset-2',
           variants[variant],
           sizes[size],
           className,

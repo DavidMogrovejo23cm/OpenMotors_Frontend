@@ -12,7 +12,7 @@ import { usePolling } from '../../hooks/usePolling';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Moto, RegistroDetalle } from '../../types';
 import { fmtDate, fmtMoney, toIsoStr } from '../../lib/utils';
-import { WORKSHOP_CONTACT } from '../../lib/constants';
+
 
 function oilThreshold(cc: number) { return cc >= 300 ? 5000 : 1000; }
 

@@ -7,7 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Wrench, Car, Package, Truck, UserCheck, CreditCard, Users, ClipboardList, Fuel, Wallet, BookOpen, Globe, LogOut, X, type LucideIcon } from 'lucide-react';
 import { initials } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../lib/theme';
+
 
 /* Rutas que YA están en la barra de tabs inferior — no se repiten en "Más". */
 function rutasDelTabBar(esClientePuro: boolean): Set<string> {

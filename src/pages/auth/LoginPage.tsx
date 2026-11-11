@@ -96,21 +96,17 @@ export default function LoginPage() {
 
   return (
     <main className="login-layout">
-      <div className="login-showcase">
-        <iframe
-          className="login-car-viewer"
-          title="Auto de Fórmula 1 en 3D"
-          allow="autoplay; fullscreen"
-          src="https://sketchfab.com/models/2cf03d35a845401c8024ad6111ed36e4/embed?ui_theme=light&autostart=1&autospin=0.25&ui_controls=0&ui_infos=0&ui_hint=0&ui_stop=0&ui_inspector=0&ui_watermark=0&ui_watermark_link=0&ui_ar=0&ui_help=0&ui_settings=0&ui_vr=0&ui_fullscreen=0&ui_annotations=0&transparent=1&preload=1&camera=0"
-        />
-      </div>
-      <section className="login-content">
+      <header className="login-header">
+        <Link to="/login" className="login-brand">
+          <img src="/brand/open-motor-logo.png" width="32" height="32" alt="" />
+          Open Motors
+        </Link>
+        <Link to="/registro" className="login-outline">Crear cuenta</Link>
+      </header>
+      <section className="login-content" aria-labelledby="login-title">
         <div className="login-form">
-          <Link to="/login" className="login-brand" aria-label="Open Motors">
-            <img src="/brand/open-motor-logo.png" width="64" height="64" alt="Open Motors" />
-          </Link>
-          <h1>Iniciar sesión</h1>
-          <p>Ingresa a tu cuenta de Open Motors.</p>
+          <h1 id="login-title">Iniciar<br /> sesión</h1>
+          <p>Accede a tu cuenta de Open Motors.</p>
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <Input label="Correo electrónico" type="email" autoComplete="username"
               placeholder="tu@correo.com" prefix={<Mail size={16} />}
@@ -120,14 +116,21 @@ export default function LoginPage() {
               error={errors.contrasena?.message} {...register('contrasena')} />
             <Link className="login-recover" to="/recuperar">¿Olvidaste tu contraseña?</Link>
             <button className="login-submit" disabled={isLoading}>
-              {isLoading ? <Ring color="#fff" /> : <ArrowRight size={17} />}
               {isLoading ? (slowConn ? 'Conectando con el servidor…' : 'Ingresando…') : 'Ingresar'}
+              {isLoading ? <Ring color="#fff" /> : <ArrowRight size={20} aria-hidden="true" />}
             </button>
           </form>
-          <p className="login-register">¿Todavía no tienes cuenta? <Link to="/registro">Crear cuenta</Link></p>
         </div>
       </section>
+      <div className="login-gallery" role="region" aria-label="Visor interactivo del auto en 3D">
+        <div className="login-viewport">
+          <iframe
+            title="Vehículo de carreras en 3D"
+            src="https://sketchfab.com/models/be09fdee3b7b4c598189ec00402c0b23/embed?ui_theme=dark&autostart=1&autospin=0.25&ui_controls=0&ui_infos=0&ui_stop=0&ui_inspector=0&ui_watermark=0&ui_ar=0&ui_help=0&ui_settings=0&ui_vr=0&ui_fullscreen=0&ui_annotations=0&transparent=1&preload=1&camera=0&ui_hint=0&ui_general_controls=0"
+            allow="autoplay"
+          />
+        </div>
+      </div>
     </main>
   );
 }
-

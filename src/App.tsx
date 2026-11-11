@@ -3,7 +3,7 @@
    React Router v7 + protección de rutas + guardas por rol
    ───────────────────────────────────────────── */
 
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useOutletContext } from 'react-router-dom';
 import { AuthProvider, useAuth }  from './contexts/AuthContext';
 import { ToastProvider }          from './components/ui/Toast';
 import ProtectedRoute             from './components/layout/ProtectedRoute';
@@ -46,18 +46,20 @@ import AjustesPage       from './pages/settings/AjustesPage';
    Debe usarse siempre dentro de <ProtectedRoute> (token garantizado).
    ──────────────────────────────────────────────────────────────────────────── */
 function RequireRole({ roles }: { roles: Array<'admin' | 'mecanico' | 'cliente'> }) {
+  const outletContext = useOutletContext();
   const { isAdmin, isMecanico, isCliente } = useAuth();
   const allowed =
     (roles.includes('admin')    && isAdmin)    ||
     (roles.includes('mecanico') && isMecanico) ||
     (roles.includes('cliente')  && isCliente);
-  return allowed ? <Outlet /> : <Navigate to="/dashboard" replace />;
+  return allowed ? <Outlet context={outletContext} /> : <Navigate to="/dashboard" replace />;
 }
 
 function RequireModule({ modulo }: { modulo: string }) {
+  const outletContext = useOutletContext();
   const { user, isAdmin, isMecanico } = useAuth();
   return canAccessModulo(user?.descripcion, modulo, isAdmin, isMecanico)
-    ? <Outlet />
+    ? <Outlet context={outletContext} />
     : <Navigate to="/dashboard" replace />;
 }
 
@@ -76,11 +78,11 @@ export default function App() {
           <Routes>
             {/* ── Rutas públicas ───────────────────────────────────────── */}
             <Route path="/login"           element={<LoginPage />}              />
-            <Route path="/registro"        element={<RegisterPage />}           />
-            <Route path="/recuperar"       element={<RecuperarPage />}          />
-            <Route path="/verificar-email" element={<EmailVerificationPage />}  />
-            <Route path="/privacidad"      element={<PrivacidadPage />}         />
-            <Route path="/terminos"        element={<TerminosPage />}           />
+            <Route path="/registro"        element={<div className="gallery-public"><RegisterPage /></div>}           />
+            <Route path="/recuperar"       element={<div className="gallery-public"><RecuperarPage /></div>}          />
+            <Route path="/verificar-email" element={<div className="gallery-public"><EmailVerificationPage /></div>}  />
+            <Route path="/privacidad"      element={<div className="gallery-public"><PrivacidadPage /></div>}         />
+            <Route path="/terminos"        element={<div className="gallery-public"><TerminosPage /></div>}           />
 
             {/* ── Rutas protegidas (requieren JWT) ─────────────────────── */}
             <Route element={<ProtectedRoute />}>

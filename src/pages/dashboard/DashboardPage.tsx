@@ -443,7 +443,7 @@ function WebDashboard() {
   /* ── Vista Admin / Mecánico ── */
   if (loading) return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="dashboard-metrics">
         {[1,2,3,4].map(i => <div key={i} className="skeleton-d h-28 rounded-2xl" />)}
       </div>
       <div className="skeleton-d h-64 rounded-2xl" />
@@ -455,27 +455,27 @@ function WebDashboard() {
   );
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="dashboard-view space-y-8 pb-8">
 
       {/* ── Header ── */}
-      <div className="flex items-end justify-between gap-4 flex-wrap">
+      <div className="dashboard-intro">
         <div>
           <p className="text-[11px] dark:text-white/28 text-slate-900/28 font-bold uppercase tracking-widest">{greeting}, {firstName}</p>
           <h1 className="text-[1.85rem] font-black dark:text-white text-slate-900 leading-tight tracking-tight">
-            Panel de <span className="text-gradient-red">Control</span>
+            Panel de control
           </h1>
           <p className="dark:text-white/30 text-slate-900/30 text-sm mt-0.5">{new Date().toLocaleDateString('es-EC', { weekday:'long', day:'numeric', month:'long' })}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <button
               onClick={printWeeklyReport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all hover:bg-white/[0.04]"
-              style={{ background: 'rgba(225,20,40,0.07)', borderColor: 'rgba(225,20,40,0.25)' }}
+              className="dashboard-report flex items-center gap-2"
+
               title="Generar e imprimir el reporte semanal del negocio"
             >
-              <Printer size={13} className="text-gm-red" />
-              <span className="text-[11px] font-bold tracking-wider uppercase text-gm-red">Reporte semanal</span>
+              <Printer size={15} aria-hidden="true" />
+              <span>Reporte semanal</span>
             </button>
           )}
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border"
@@ -496,7 +496,7 @@ function WebDashboard() {
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="dashboard-metrics">
         <KpiCard icon={Car}    label="Vehículos registrados" target={motos.length}    sub="vehículos totales"   to="/motos"      color="#3B82F6" />
         <KpiCard icon={Wrench}  label="Órdenes activas"   target={activas}         sub="en proceso/pendiente" to="/registros"  color="#E11428" />
         <KpiCard icon={Package} label="Stock crítico"      target={stockCritico}   sub="productos ≤3 unidades" to="/inventario" color="#F59E0B" />
@@ -538,17 +538,14 @@ function WebDashboard() {
 
         return (
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] mb-3"
-               style={{ color:'rgba(255,255,255,0.22)' }}>
-              Panel general · haz clic para ir al módulo
-            </p>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+            <h2 className="dashboard-section-title">Módulos del taller</h2>
+            <div className="dashboard-modules">
               {MODS_VISIBLES.map(({ to, label, icon: Icon, color, val, sub, pct: p }) => (
                 <Link key={to} to={to}
-                  className="gm-mod-card rounded-xl p-3.5 text-center block"
+                  className="gm-mod-card dashboard-module"
                   style={{ textDecoration:'none' }}
                 >
-                  <div className="w-8 h-8 rounded-xl mx-auto mb-2 flex items-center justify-center"
+                  <div className="dashboard-module-icon flex items-center justify-center"
                        style={{ background:`${color}18`, border:`1px solid ${color}30` }}>
                     <Icon size={14} style={{ color }} />
                   </div>
@@ -595,7 +592,7 @@ function WebDashboard() {
         {/* Resumen Contable */}
         <div className="gm-card-d rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <TrendingUp size={13} className="text-gm-red/60" />
               <p className="text-[10px] tracking-[0.28em] uppercase dark:text-white/28 text-slate-900/28 font-bold">Rendimiento (7 días)</p>
             </div>
@@ -617,7 +614,7 @@ function WebDashboard() {
             <div className="flex-1 space-y-2">
               {pieData.map(d => (
                 <div key={d.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
                     <span className="text-[12px] dark:text-white/50 text-slate-900/50 font-medium">{d.name}</span>
                   </div>
