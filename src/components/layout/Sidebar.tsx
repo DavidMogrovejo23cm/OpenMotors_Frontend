@@ -70,7 +70,7 @@ export default function Sidebar({ collapsed = false, onToggleCollapse }: Sidebar
       <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/60">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-[#d62828] animate-pulse" />
             <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
               Navegación
             </span>
