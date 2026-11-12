@@ -58,7 +58,7 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
   const dialog = (
     <div
       ref={backdropRef}
-      className={cn("fixed inset-0 flex items-center justify-center p-4", portal ? "z-[200]" : "z-50")}
+      className={cn("gm-modal-backdrop fixed inset-0 flex items-center justify-center p-3 sm:p-4", portal ? "z-[200]" : "z-50")}
       style={{ background: portal ? 'rgba(15,23,42,0.45)' : 'rgba(0,0,0,0.7)', backdropFilter: portal ? 'blur(4px)' : 'blur(8px)' }}
       onClick={(e) => e.target === backdropRef.current && handleClose()}
       onKeyDown={(e) => { if (portal && e.key === "Escape") handleClose(); }}
@@ -68,7 +68,7 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
-        className={cn('relative w-full rounded-2xl flex flex-col max-h-[90vh]', sizes[size])}
+        className={cn('gm-modal-panel relative min-w-0 w-full rounded-2xl flex flex-col max-h-[90dvh]', sizes[size])}
         style={{
           background: isDark
             ? 'linear-gradient(145deg, #1C1C24 0%, #141418 100%)'
@@ -83,7 +83,7 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-4"
+          <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4"
             style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F0F1F3' }}>
             <h2 id="modal-title" className="text-base font-bold"
               style={{ color: isDark ? 'rgba(255,255,255,0.9)' : '#15151B' }}>{title}</h2>
@@ -99,11 +99,11 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
         )}
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 dark-scroll">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 dark-scroll">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="px-6 py-4 flex justify-end gap-3"
+          <div className="px-4 py-3 sm:px-6 sm:py-4 flex flex-wrap justify-end gap-2"
             style={{ borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F0F1F3' }}>
             {footer}
           </div>

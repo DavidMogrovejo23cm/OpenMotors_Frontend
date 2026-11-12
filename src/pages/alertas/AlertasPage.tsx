@@ -149,7 +149,7 @@ export default function AlertasPage() {
         </div>
 
         {/* Refresh + KPI */}
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:w-auto sm:items-end">
           <button
             onClick={load}
             disabled={loading}
@@ -159,19 +159,18 @@ export default function AlertasPage() {
             <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
             {lastUpdated ? `Actualizado ${lastUpdated.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}` : 'Actualizar'}
           </button>
-          <div className="flex items-center bg-white/[0.025] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="grid w-full grid-cols-2 overflow-hidden rounded-2xl border border-gm-border bg-gm-bg min-[380px]:grid-cols-4 sm:w-auto">
           {([
             ['overdue', 'Vencidos', counts.overdue, '#EF4444'],
             ['due',     'Urgentes', counts.due,     '#F59E0B'],
             ['soon',    'Próximos', counts.soon,    '#3B82F6'],
             ['ok',      'Al día',   counts.ok,      '#10B981'],
-          ] as const).map(([key, lbl, cnt, col], i, arr) => (
-            <div key={key} className="flex items-center">
-              <div className="flex flex-col items-center gap-0.5 px-5 py-3">
+          ] as const).map(([key, lbl, cnt, col]) => (
+            <div key={key} className="min-w-0">
+              <div className="flex flex-col items-center gap-0.5 px-2 py-3 sm:px-4">
                 <span className="text-xl font-black" style={{ color: col }}>{cnt}</span>
                 <span className="text-[9px] font-bold dark:text-white/28 text-slate-900/28 uppercase tracking-wider">{lbl}</span>
               </div>
-              {i < arr.length - 1 && <div className="w-px h-8 bg-white/[0.07]" />}
             </div>
           ))}
           </div>

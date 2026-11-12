@@ -5,7 +5,7 @@
 
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-// AnimatePresence kept for mobile drawer only — main content uses plain motion.div to avoid scroll freeze
+
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, ChevronDown, Menu, X, KeyRound, Download } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
@@ -197,9 +197,9 @@ export default function AppLayout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.22 }}
+              transition={{ duration: 0.14 }}
               className="fixed inset-0 z-[60] md:hidden"
-              style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)' }}
+              style={{ background: 'rgba(15,23,42,0.46)' }}
               onClick={() => setMobileOpen(false)}
             />
             {/* Drawer */}
@@ -208,8 +208,8 @@ export default function AppLayout() {
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'spring', stiffness: 340, damping: 34 }}
-              className="fixed inset-y-0 left-0 w-72 z-[70] md:hidden flex flex-col"
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              className="fixed inset-y-0 left-0 w-72 max-w-[calc(100vw-32px)] z-[70] md:hidden flex flex-col"
               style={{
                 background: isDark ? 'linear-gradient(180deg,#15151C 0%,#111115 100%)' : '#FFFFFF',
                 borderRight: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E4E7EC',
@@ -321,16 +321,14 @@ export default function AppLayout() {
       <header
         className="gm-topbar sticky top-0 z-50 flex-none"
         style={{ 
-          backdropFilter: 'blur(16px)', 
-          WebkitBackdropFilter: 'blur(16px)',
           paddingTop: isNativeApp ? 'env(safe-area-inset-top, 34px)' : undefined
         }}
       >
-        <div className="flex items-center gap-3 px-4 lg:px-10 h-[62px] max-w-screen-2xl mx-auto">
+        <div className="app-topbar-inner flex items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-10 min-h-[62px] max-w-screen-2xl mx-auto">
 
           {/* Hamburger — solo mobile */}
           <button
-            className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl shrink-0 transition-all"
+            className="md:hidden flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-all"
             style={{ background: topBtnBg, border: `1px solid ${topBtnBdr}` }}
             onClick={() => setMobileOpen(true)}
             aria-label="Abrir menú"
@@ -415,12 +413,12 @@ export default function AppLayout() {
                     deferredPrompt.prompt();
                     deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs shadow-md transition-all hover:scale-105 active:scale-95"
+                  className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2 font-bold text-xs sm:px-3"
                   style={{ background: '#E11428', color: '#FFF' }}
                   title="Instalar Open Motors"
                 >
                   <Download size={14} />
-                  Instalar
+                  <span className="hidden sm:inline">Instalar</span>
                 </button>
               )}
             {/* Bell de notificaciones */}
@@ -449,7 +447,7 @@ export default function AppLayout() {
             <div className="relative">
               <button
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
+                className="flex min-h-11 items-center gap-1.5 px-2 py-1.5 rounded-xl transition-colors"
                 style={{
                   background: open ? `${roleColor}22` : topBtnBg,
                   border: `1px solid ${open ? roleColor + '40' : topBtnBdr}`,
@@ -541,7 +539,7 @@ export default function AppLayout() {
       </header>
 
       {/* ══ CUERPO PRINCIPAL CON SIDEBAR LATERAL ══ */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-w-0">
         {/* Sidebar Lateral en Desktop */}
         <Sidebar
           collapsed={sidebarCollapsed}
@@ -549,13 +547,8 @@ export default function AppLayout() {
         />
 
         {/* ══ CONTENIDO DE CADA PÁGINA ════════════════════════════════ */}
-        <main className="gallery-content flex-1 min-w-0 overflow-y-auto min-h-[calc(100vh-62px)]">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-            className="p-4 md:p-6 lg:p-8 max-w-screen-2xl mx-auto"
+        <main className="gallery-content flex-1 min-w-0 min-h-[calc(100dvh-62px)]">
+          <div key={location.pathname} className="app-page mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-8 lg:py-8"
             style={{ paddingBottom: isNativeApp ? 120 : undefined }}
           >
             {/* Boundary por página: si una pantalla falla, el menú sigue vivo
@@ -563,7 +556,7 @@ export default function AppLayout() {
             <ErrorBoundary resetKey={location.pathname}>
               <Outlet context={lastNonClientRoute.current} />
             </ErrorBoundary>
-          </motion.div>
+          </div>
         </main>
       </div>
 
@@ -576,7 +569,7 @@ export default function AppLayout() {
           href={whatsappCitaLink('Hola! Quiero agendar una cita en Open Motors 🚗')}
           target="_blank"
           rel="noopener noreferrer"
-          className="fixed z-50 flex items-center justify-center rounded-full shadow-2xl transition-transform hover:scale-110 active:scale-95"
+          className="app-whatsapp fixed z-40 flex items-center justify-center rounded-full shadow-lg"
           style={{
             bottom: 24,
             right: 20,

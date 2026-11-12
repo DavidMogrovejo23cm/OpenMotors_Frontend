@@ -98,8 +98,8 @@ function ActivityAreaChart({ data, isAdmin, isDark }: {
           <XAxis dataKey="day" tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} />
           <Tooltip content={<DarkTooltip />} />
-          <Area type="monotone" dataKey="ordenes" name="Órdenes" stroke="#E11428" strokeWidth={2} fill="url(#gradOrdenes)" dot={false} />
-          {isAdmin && <Area type="monotone" dataKey="ingresos" name="Ingresos $" stroke="#10B981" strokeWidth={2} fill="url(#gradIngresos)" dot={false} />}
+          <Area isAnimationActive={false} type="monotone" dataKey="ordenes" name="Órdenes" stroke="#E11428" strokeWidth={2} fill="url(#gradOrdenes)" dot={false} />
+          {isAdmin && <Area isAnimationActive={false} type="monotone" dataKey="ingresos" name="Ingresos $" stroke="#10B981" strokeWidth={2} fill="url(#gradIngresos)" dot={false} />}
         </AreaChart>
       )}
     </div>
@@ -117,7 +117,7 @@ function EstadosPieChart({ data, isDark }: {
     <div ref={wrapRef} className="recharts-custom w-36 h-36 shrink-0" style={{ height: H }}>
       {cw > 0 && (
         <PieChart width={cw} height={H}>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" strokeWidth={2} stroke={stroke}>
+          <Pie isAnimationActive={false} data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" strokeWidth={2} stroke={stroke}>
             {data.map((entry, i) => <Cell key={i} fill={entry.color} />)}
           </Pie>
           <Tooltip content={<DarkTooltip />} />

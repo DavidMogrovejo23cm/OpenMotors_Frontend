@@ -217,9 +217,9 @@ function BusinessChart({ ingresos, gastos, labels, isDark }: {
             cursor={{ fill: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
           />
           <ReferenceLine y={0} stroke={zeroColor} strokeWidth={1}/>
-          <Bar dataKey="Ingresos" fill="url(#gm-gradIng)" radius={[4,4,0,0]} maxBarSize={32}/>
-          <Bar dataKey="Gastos"   fill="url(#gm-gradGas)" radius={[4,4,0,0]} maxBarSize={32}/>
-          <Line
+          <Bar isAnimationActive={false} dataKey="Ingresos" fill="url(#gm-gradIng)" radius={[4,4,0,0]} maxBarSize={32}/>
+          <Bar isAnimationActive={false} dataKey="Gastos"   fill="url(#gm-gradGas)" radius={[4,4,0,0]} maxBarSize={32}/>
+          <Line isAnimationActive={false}
             type="monotone" dataKey="Balance" stroke="#F59E0B" strokeWidth={2}
             dot={{ fill:'#F59E0B', r:3, strokeWidth:0 }}
             activeDot={{ r:5, fill:'#F59E0B', strokeWidth:0 }}
@@ -1368,7 +1368,7 @@ export default function ContabilidadPage() {
           const totalGas = chartGastos.reduce((s,v)=>s+v,0);
           const rentabilidad = totalIng > 0 ? ((totalIng - totalGas) / totalIng * 100) : 0;
           return (
-            <div className="mt-5 pt-5 border-t grid grid-cols-3 gap-4"
+            <div className="mt-5 pt-5 border-t grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4"
                  style={{ borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)' }}>
               <div className="text-center">
                 <p className="text-[10px] dark:text-white/25 text-slate-900/25 uppercase tracking-widest mb-1">Tendencia</p>

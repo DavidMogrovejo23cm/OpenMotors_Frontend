@@ -861,7 +861,7 @@ export default function ClientesPage() {
           </div>
 
           {/* KPI strip */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {[
               { label:'Total clientes',    value:clientes.length, icon:Users,      color:'#3B82F6' },
               { label:'Visitas totales',   value:totalVisitas,    icon:Wrench,     color:'#E11428' },

@@ -9,6 +9,10 @@ import { isNativeApp } from '../lib/platform';
 
 gsap.registerPlugin(ScrollTrigger);
 
+export function prefersStaticMotion() {
+  return isNativeApp || window.matchMedia('(pointer: coarse), (max-width: 767px), (prefers-reduced-motion: reduce)').matches;
+}
+
 /* ── Configuración global: reducir duración en APK para evitar trabas ── */
 if (isNativeApp) {
   gsap.config({ force3D: true });
@@ -30,14 +34,12 @@ export function safeFromTo(
     typeof selector === 'string'
       ? gsap.utils.toArray<Element>(selector)
       : Array.isArray(selector) ? selector : [selector];
-  if (!targets.length) return;
+  if (!targets.length || prefersStaticMotion()) return;
 
   const toFinal: gsap.TweenVars = { ...to, overwrite: 'auto' };
-  if (isNativeApp) {
-    if (typeof toFinal.duration === 'number') toFinal.duration *= 0.5;
-    if (typeof toFinal.stagger === 'number') toFinal.stagger  *= 0.5;
-  }
-  gsap.fromTo(targets, from, toFinal);
+  if (typeof toFinal.duration === 'number') toFinal.duration = Math.min(toFinal.duration, 0.25);
+  if (typeof toFinal.stagger === 'number') toFinal.stagger = Math.min(toFinal.stagger, 0.02);
+  gsap.fromTo(targets.slice(0, 12), from, toFinal);
 }
 
 /** Animación de entrada en cascada para la página */
@@ -126,12 +128,13 @@ export function useCountUp<T extends HTMLElement = HTMLSpanElement>(target: numb
   useEffect(() => {
     if (!ref.current) return;
     const el = ref.current;
+    if (prefersStaticMotion()) { el.textContent = String(target); return; }
     const obj = { val: 0 };
 
     const ctx = gsap.context(() => {
       gsap.to(obj, {
         val: target,
-        duration,
+        duration: Math.min(duration, 0.45),
         ease: 'power2.out',
         onUpdate: () => {
           el.textContent = Math.round(obj.val).toString();
@@ -163,7 +166,7 @@ export function useTilt3D(opts?: { max?: number; idle?: boolean }) {
 
   useEffect(() => {
     /* En APK (touch) el tilt y el idle-loop son inútiles y consumen CPU */
-    if (isNativeApp) return;
+    if (prefersStaticMotion()) return;
     const scene = sceneRef.current;
     const tilt  = tiltRef.current;
     if (!scene || !tilt) return;
@@ -273,13 +276,13 @@ export function usePageEntrance() {
 
       /* En APK con muchos elementos: skip animación, mostrar directamente */
       const totalEls = headers.length + cards.length + sections.length + rows.length;
-      if (isNativeApp && totalEls > 20) {
+      if (prefersStaticMotion() || totalEls > 20) {
         gsap.set([...headers, ...cards, ...sections, ...rows], { opacity: 1, y: 0, x: 0, scale: 1, clearProps: 'all' });
         return;
       }
 
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-      const d = isNativeApp ? 0.5 : 1;
+      const d = 0.5;
       if (headers.length)  tl.fromTo(headers,  { y: -18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55 * d, stagger: 0.05 * d, overwrite: 'auto' });
       if (cards.length)    tl.fromTo(cards,    { y: 36, opacity: 0, scale: 0.97 }, { y: 0, opacity: 1, scale: 1, stagger: 0.07 * d, duration: 0.6 * d, clearProps: 'transform', overwrite: 'auto' }, '-=0.3');
       if (sections.length) tl.fromTo(sections, { y: 24, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.08 * d, duration: 0.55 * d, overwrite: 'auto' }, '-=0.35');
@@ -295,7 +298,7 @@ export function useMouseParallax(strength = 18) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isNativeApp) return;
+    if (prefersStaticMotion()) return;
     const el = ref.current;
     if (!el) return;
 

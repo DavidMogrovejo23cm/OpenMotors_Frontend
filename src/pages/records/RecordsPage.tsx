@@ -12,6 +12,7 @@ import {
   UserPlus, Zap, AlertTriangle, CreditCard, MapPin,
 } from 'lucide-react';
 import gsap from 'gsap';
+import { prefersStaticMotion } from '../../hooks/useGsap';
 import { registrosApi, usuariosApi, motosApi, tiposApi, mantenimientosApi, productosApi } from '../../lib/api';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -272,12 +273,13 @@ export default function RecordsPage() {
   /* ─── Animación ─── */
   useEffect(() => {
     if (loading) return;
+    if (prefersStaticMotion()) return;
     const ctx = gsap.context(() => {
       const headers  = gsap.utils.toArray<HTMLElement>('.header-enter');
       const cards    = gsap.utils.toArray<HTMLElement>('.card-enter');
       const sections = gsap.utils.toArray<HTMLElement>('.section-enter');
       if (headers.length)  gsap.fromTo(headers,  { y: -16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, stagger: 0.05, ease: 'power3.out', overwrite: 'auto' });
-      if (cards.length)    gsap.fromTo(cards,    { y: 32, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.08, duration: 0.6, ease: 'power3.out', clearProps: 'transform', overwrite: 'auto', delay: 0.1 });
+      if (cards.length)    gsap.fromTo(cards,    { y: 32, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.02, duration: 0.25, ease: 'power3.out', clearProps: 'transform', overwrite: 'auto', delay: 0.1 });
       if (sections.length) gsap.fromTo(sections, { y: 22, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out', overwrite: 'auto', delay: 0.2 });
     }, pageRef);
     return () => ctx.revert();
@@ -836,12 +838,12 @@ export default function RecordsPage() {
   ];
 
   return (
-    <div ref={pageRef} className="space-y-7 pb-8">
+    <div ref={pageRef} className="records-page min-w-0 space-y-5 pb-8 sm:space-y-7">
 
       {/* ─── Header ─── */}
-      <div className="header-enter flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-2">
+      <div className="header-enter flex flex-col items-center text-center sm:flex-row sm:items-end sm:text-left justify-between gap-4 pt-2">
         <div>
-          <p className="text-[10px] tracking-[0.35em] uppercase dark:text-white/25 text-slate-900/25 font-semibold mb-2 flex items-center gap-2">
+          <p className="text-[10px] tracking-[0.35em] uppercase dark:text-white/25 text-slate-900/25 font-semibold mb-2 flex items-center justify-center gap-2 sm:justify-start">
             <Wrench size={10} className="text-gm-red" />
             Taller · Servicios
           </p>
@@ -856,14 +858,14 @@ export default function RecordsPage() {
       </div>
 
       {/* ─── Status cards (5 estados) ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="records-status grid gap-3 sm:gap-4">
         {STATUS_CARDS.map(({ estado: e, label, icon: Icon, color, glow, border }) => {
           const isActive = estadoFlt === e;
           return (
             <button
               key={e}
               onClick={() => setEstadoFlt(isActive ? -1 : e)}
-              className="card-enter gm-card-d rounded-2xl p-4 text-left transition-all duration-200 group"
+              className="card-enter gm-card-d min-w-0 rounded-2xl p-3 text-left sm:p-4 transition-all duration-200 group"
               style={isActive ? { borderColor: border, boxShadow: `0 0 0 1px ${border}40, 0 0 40px ${glow}` } : {}}
             >
               <div className="flex items-center justify-between mb-2">
@@ -878,7 +880,7 @@ export default function RecordsPage() {
       </div>
 
       {/* ─── Búsqueda + filtros ─── */}
-      <div className="section-enter flex flex-wrap gap-3 items-center">
+      <div className="records-filters section-enter flex flex-wrap items-center justify-center gap-3 sm:justify-start">
         <div className="search-d">
           <Search size={14} />
           <input
@@ -889,7 +891,7 @@ export default function RecordsPage() {
           />
         </div>
         {/* Filtro rápido de fecha */}
-        <div className="flex rounded-xl overflow-hidden shrink-0"
+        <div className="records-date flex max-w-full overflow-hidden rounded-xl"
              style={{ border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E4E7EC'}` }}>
           {([
             { key: 'hoy',    label: 'Hoy'     },
@@ -898,7 +900,7 @@ export default function RecordsPage() {
             { key: 'todo',   label: 'Todos'   },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setDateFlt(key)}
-              className="px-3 py-1.5 text-[11px] font-bold transition-all"
+              className="flex-1 px-2 py-2.5 text-[11px] font-bold transition-all sm:px-3"
               style={{
                 background: dateFlt === key
                   ? isDark ? 'rgba(225,20,40,0.2)' : 'rgba(225,20,40,0.12)'
@@ -913,7 +915,7 @@ export default function RecordsPage() {
             </button>
           ))}
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
           {ESTADOS.map(({ value, label }) => (
             <button
               key={value}
@@ -929,7 +931,7 @@ export default function RecordsPage() {
 
       {/* ─── Tabla ─── */}
       <div className="section-enter gm-card-d rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto dark-scroll">
+        <div className="overflow-x-auto dark-scroll" tabIndex={0} role="region" aria-label="Tabla de órdenes de servicio">
           <table className="gm-table-d">
             <thead>
               <tr>
@@ -1175,7 +1177,7 @@ export default function RecordsPage() {
                       {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <input className="gm-input-d" placeholder="Marca *" value={qMarca} onChange={e => setQMarca(e.target.value)} />
                     <input className="gm-input-d" placeholder="Modelo *" value={qModelo} onChange={e => setQModelo(e.target.value)} />
                   </div>

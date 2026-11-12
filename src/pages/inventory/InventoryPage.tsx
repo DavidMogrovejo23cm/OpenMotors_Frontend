@@ -10,6 +10,7 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import gsap from 'gsap';
+import { prefersStaticMotion } from '../../hooks/useGsap';
 import { productosApi, categoriasApi, usuariosApi, motosApi, facturasApi, detallesFacturaApi, proveedorContactosApi } from '../../lib/api';
 import { isNativeApp } from '../../lib/platform';
 import { useTheme } from '../../lib/theme';
@@ -188,13 +189,14 @@ export default function InventoryPage() {
   /* Animación de entrada — solo cuando termina de cargar */
   useEffect(() => {
     if (loading) return;
+    if (prefersStaticMotion()) return;
     const ctx = gsap.context(() => {
       const headers  = gsap.utils.toArray<HTMLElement>('.header-enter');
       const cards    = gsap.utils.toArray<HTMLElement>('.card-enter');
       const sections = gsap.utils.toArray<HTMLElement>('.section-enter');
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
       if (headers.length)  tl.fromTo(headers,  { y: -16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, stagger: 0.05 });
-      if (cards.length)    tl.fromTo(cards,    { y: 32, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.08, duration: 0.6, clearProps: 'transform' }, '-=0.3');
+      if (cards.length)    tl.fromTo(cards,    { y: 32, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.02, duration: 0.25, clearProps: 'transform' }, '-=0.3');
       if (sections.length) tl.fromTo(sections, { y: 22, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5 }, '-=0.3');
     }, pageRef);
     return () => ctx.revert();
@@ -953,7 +955,7 @@ export default function InventoryPage() {
             </select>
           </div>
           <Input label="Descripción" placeholder="Describe el producto" error={errors.descripcion?.message} {...register('descripcion')} />
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <Input label="Costo ($)" type="number" step="0.01" placeholder="0.00" error={errors.costo?.message} {...register('costo')} />
             <Input label="PVP ($)" type="number" step="0.01" placeholder="0.00" error={errors.pvp?.message} {...register('pvp')} />
             <div>
@@ -1295,7 +1297,7 @@ export default function InventoryPage() {
         }
       >
         {vnTarget && vnStep === 'search' && (
-          <div className="grid grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-5">
 
             {/* ── Columna izquierda: producto + instrucción ── */}
             <div className="col-span-2 space-y-4">
@@ -1381,7 +1383,7 @@ export default function InventoryPage() {
         )}
 
         {vnTarget && vnStep === 'confirm' && vnCliente && (
-          <div className="grid grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-5">
 
             {/* ── Izquierda: cliente + producto ── */}
             <div className="col-span-2 space-y-3">

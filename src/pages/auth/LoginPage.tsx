@@ -9,10 +9,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { getErrorMsg } from '../../lib/utils';
 import Input from '../../components/ui/Input';
+import LoginCarViewer from '../../components/3d/LoginCarViewer';
 import { healthApi } from '../../lib/api';
 
 
 
+
+const desktopGallery = window.matchMedia("(min-width: 901px)");
 
 const schema = z.object({
   correo:     z.string().trim().min(1, 'Ingresa tu correo o usuario'),
@@ -36,6 +39,13 @@ export default function LoginPage() {
   const toast        = useToast();
   const [params]     = useSearchParams();
   const [loginLoading, setLoginLoading] = useState(false);
+
+  const [showGallery, setShowGallery] = useState(desktopGallery.matches);
+  useEffect(() => {
+    const updateGallery = () => setShowGallery(desktopGallery.matches);
+    desktopGallery.addEventListener('change', updateGallery);
+    return () => desktopGallery.removeEventListener('change', updateGallery);
+  }, []);
 
   /* Navegación reactiva — se dispara cuando hay sesión válida en el contexto */
   useEffect(() => {
@@ -82,6 +92,8 @@ export default function LoginPage() {
         } catch (retryErr) {
           toast.error(getErrorMsg(retryErr), 'Error de acceso');
         }
+      } else if (import.meta.env.DEV && isAxiosError(err) && (!err.response || err.response.status >= 500)) {
+        toast.error('No se pudo conectar con la API local. Comprueba que FastAPI esté activo en el puerto 8080.', 'Error de acceso');
       } else {
         toast.error(isAxiosError(err) ? getErrorMsg(err) : (err as Error).message, 'Error de acceso');
       }
@@ -122,15 +134,7 @@ export default function LoginPage() {
           </form>
         </div>
       </section>
-      <div className="login-gallery" role="region" aria-label="Visor interactivo del auto en 3D">
-        <div className="login-viewport">
-          <iframe
-            title="Vehículo de carreras en 3D"
-            src="https://sketchfab.com/models/be09fdee3b7b4c598189ec00402c0b23/embed?ui_theme=dark&autostart=1&autospin=0.25&ui_controls=0&ui_infos=0&ui_stop=0&ui_inspector=0&ui_watermark=0&ui_ar=0&ui_help=0&ui_settings=0&ui_vr=0&ui_fullscreen=0&ui_annotations=0&transparent=1&preload=1&camera=0&ui_hint=0&ui_general_controls=0"
-            allow="autoplay"
-          />
-        </div>
-      </div>
+      {showGallery && <LoginCarViewer />}
     </main>
   );
 }

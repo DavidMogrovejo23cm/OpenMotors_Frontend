@@ -144,18 +144,18 @@ export function NotificationPanel({
   return (
     <div
       ref={panelRef}
-      className="notif-panel absolute right-0 top-full mt-2 w-[340px] sm:w-[380px] rounded-2xl overflow-hidden z-50 dark-scroll"
+      className="notif-panel fixed inset-x-3 top-[68px] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] rounded-2xl overflow-hidden z-50 dark-scroll"
       style={{
         background: panelBg,
         border: panelBorder,
         boxShadow: panelShadow,
-        maxHeight: '70vh',
+        maxHeight: '70dvh',
         overflowY: 'auto',
       }}
     >
       {/* Header */}
       <div className="notif-header flex items-center justify-between px-4 py-2.5 sticky top-0"
-           style={{ background: headerBg, backdropFilter: 'blur(12px)', borderBottom: `1px solid ${headerBorder}` }}>
+           style={{ background: headerBg, borderBottom: `1px solid ${headerBorder}` }}>
         <div className="flex items-center gap-2">
           <Bell size={14} className="text-gm-red" />
           <span className="text-[13px] font-black" style={{ color: textMain }}>Notificaciones</span>

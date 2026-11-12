@@ -10,6 +10,7 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import gsap from 'gsap';
+import { prefersStaticMotion } from '../../hooks/useGsap';
 import { motosApi, usuariosApi } from '../../lib/api';
 import { comprimirImagen, imagenMoto } from '../../lib/fotos';
 import { useToast } from '../../components/ui/Toast';
@@ -97,10 +98,12 @@ function MotoCard({
   };
 
   const handleEnter = () => {
+    if (prefersStaticMotion()) return;
     gsap.to(cardRef.current, { y: -6, scale: 1.018, duration: 0.35, ease: 'power2.out' });
     gsap.to(glowRef.current, { opacity: 1, duration: 0.3 });
   };
   const handleLeave = () => {
+    if (prefersStaticMotion()) return;
     gsap.to(cardRef.current, { y: 0, scale: 1, duration: 0.45, ease: 'power3.out' });
     gsap.to(glowRef.current, { opacity: 0, duration: 0.4 });
     if (glowRef.current) glowRef.current.style.background = 'none';
@@ -276,12 +279,13 @@ export default function MotosPage() {
 
   useEffect(() => {
     if (loading) return;
+    if (prefersStaticMotion()) return;
     const ctx = gsap.context(() => {
       const headers = gsap.utils.toArray<HTMLElement>('.mp-header-el');
       const cards   = gsap.utils.toArray<HTMLElement>('.card-enter');
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
       if (headers.length) tl.fromTo(headers, { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, stagger: 0.06 });
-      if (cards.length)   tl.fromTo(cards,   { y: 40, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.08, duration: 0.65, clearProps: 'transform' }, '-=0.3');
+      if (cards.length)   tl.fromTo(cards,   { y: 40, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.02, duration: 0.255, clearProps: 'transform' }, '-=0.3');
     }, pageRef);
     return () => ctx.revert();
   }, [loading]);
@@ -603,7 +607,7 @@ export default function MotosPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">Tipo de vehículo</label>
               <select className="gm-input-d" {...register('tipo_vehiculo')}>

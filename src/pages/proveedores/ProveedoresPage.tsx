@@ -512,7 +512,7 @@ export default function ProveedoresPage() {
       </div>
 
       {/* ─── Resumen KPI ─── */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {[
           { label: 'Proveedores',  value: grupos.length,  color: '#3B82F6', icon: Truck        },
           { label: 'Con alerta',   value: totalAlertas,   color: '#F59E0B', icon: AlertTriangle },
