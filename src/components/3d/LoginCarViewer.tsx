@@ -23,9 +23,15 @@ const options = {
   ui_watermark_link: 0,
 };
 
+type CameraPoint = [number, number, number];
+
 type Viewer = {
   addEventListener(event: 'viewerready', callback: () => void): void;
-  recenterCamera(): void;
+  getCameraLookAt(callback: (error: unknown, camera: {
+    position: CameraPoint;
+    target: CameraPoint;
+  }) => void): void;
+  setCameraLookAt(position: CameraPoint, target: CameraPoint, duration: number): void;
 };
 
 type SketchfabClient = new (iframe: HTMLIFrameElement) => {
@@ -59,6 +65,7 @@ export default function LoginCarViewer() {
     const iframe = iframeRef.current;
     if (!iframe) return;
     let active = true;
+    let initialZoomApplied = false;
 
     const fallback = () => {
       if (!active) return;
@@ -73,7 +80,19 @@ export default function LoginCarViewer() {
       new Client(iframe).init(model, {
         ...options,
         success: (api) => api.addEventListener('viewerready', () => {
-          if (active) api.recenterCamera();
+          if (!active || initialZoomApplied) return;
+          initialZoomApplied = true;
+          api.getCameraLookAt((error, camera) => {
+            if (error || !active) return;
+            const { position, target } = camera;
+            const distanceFactor = 1.8;
+            const closerPosition: CameraPoint = [
+              target[0] + (position[0] - target[0]) * distanceFactor,
+              target[1] + (position[1] - target[1]) * distanceFactor,
+              target[2] + (position[2] - target[2]) * distanceFactor,
+            ];
+            api.setCameraLookAt(closerPosition, target, 0);
+          });
         }),
         error: fallback,
       });
