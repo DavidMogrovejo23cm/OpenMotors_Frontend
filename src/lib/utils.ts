@@ -58,6 +58,8 @@ export const ESTADO_REGISTRO: Record<number, { label: string; color: string }> =
   2: { label: 'Completado', color: 'bg-green-100 text-green-700'   },
   3: { label: 'Entregado',  color: 'bg-purple-100 text-purple-700' },
   4: { label: 'Facturado',  color: 'bg-teal-100 text-teal-700'     },
+  7: { label: 'Pagado',     color: 'bg-green-100 text-green-700'   },
+  8: { label: 'Cancelado',  color: 'bg-red-100 text-red-700'       },
 };
 
 /** Lee la lista de módulos permitidos del campo descripcion (PERMISOS:mod1,mod2) */
@@ -196,4 +198,10 @@ export function getErrorMsg(err: unknown): string {
   }
   if (typeof err === 'string') return err;
   return 'Error inesperado';
+}
+
+export function nivelDiagnostico(estado: string | number): 1 | 2 | 3 {
+  if (estado === 'BUENO' || estado === 1) return 1;
+  if (estado === 'REGULAR' || estado === 2) return 2;
+  return 3;
 }

@@ -15,7 +15,7 @@ import { healthApi } from '../../lib/api';
 
 
 const schema = z.object({
-  correo:     z.string().email('Correo no válido'),
+  correo:     z.string().trim().min(1, 'Ingresa tu correo o usuario'),
   contrasena: z.string().min(1, 'Ingresa tu contraseña'),
 });
 type Form = z.infer<typeof schema>;
@@ -101,14 +101,14 @@ export default function LoginPage() {
           <img src="/brand/open-motor-logo.png" width="32" height="32" alt="" />
           Open Motors
         </Link>
-        <Link to="/registro" className="login-outline">Crear cuenta</Link>
+        <Link to="/registro" className="login-outline">Solicitar cuenta</Link>
       </header>
       <section className="login-content" aria-labelledby="login-title">
         <div className="login-form">
           <h1 id="login-title">Iniciar<br /> sesión</h1>
           <p>Accede a tu cuenta de Open Motors.</p>
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <Input label="Correo electrónico" type="email" autoComplete="username"
+            <Input label="Correo o usuario" type="text" autoComplete="username" autoCapitalize="none"
               placeholder="tu@correo.com" prefix={<Mail size={16} />}
               error={errors.correo?.message} {...register('correo')} />
             <Input label="Contraseña" type="password" autoComplete="current-password"

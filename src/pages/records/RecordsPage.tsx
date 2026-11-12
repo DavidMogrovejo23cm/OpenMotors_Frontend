@@ -12,7 +12,7 @@ import {
   UserPlus, Zap, AlertTriangle, CreditCard, MapPin,
 } from 'lucide-react';
 import gsap from 'gsap';
-import { registrosApi, usuariosApi, motosApi, tiposApi, authApi, mantenimientosApi, productosApi } from '../../lib/api';
+import { registrosApi, usuariosApi, motosApi, tiposApi, mantenimientosApi, productosApi } from '../../lib/api';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
@@ -164,6 +164,11 @@ export default function RecordsPage() {
   const [productos,  setProductos]  = useState<Producto[]>([]);
 
   /* ─── Nueva Orden ─── */
+  const [quickClient, setQuickClient] = useState<{
+    usuario: Usuario;
+    credencialTemporal: { nombreUsuario: string; contrasena: string };
+  } | null>(null);
+
   const [newOrderOpen,   setNewOrderOpen]   = useState(false);
   const [nCliente,       setNCliente]       = useState<Usuario | null>(null);
   const [nMoto,          setNMoto]          = useState<Moto | null>(null);
@@ -250,7 +255,7 @@ export default function RecordsPage() {
   usePolling(() => fetchData(true), { intervalMs: 120_000 });
 
   /* Mantenimientos (nube) de la moto seleccionada → para las recomendaciones por km */
-  const idMotoSeleccionada = nMoto?.id_moto;
+  const idMotoSeleccionada = nMoto?.id_vehiculo;
   useEffect(() => {
     if (!idMotoSeleccionada) { setNMotoServicios({}); return; }
     mantenimientosApi.byMoto(idMotoSeleccionada)
@@ -314,6 +319,7 @@ export default function RecordsPage() {
 
   /* ─── Crear nueva orden ─── */
   const resetNewOrder = () => {
+    setQuickClient(null);
     setNCliente(null); setNMoto(null); setNTipo(null);
     setNKm(''); setNObs(''); setNManCustom(''); setNPartes([]);
     setNFecha(isoDateOffset()); setNFechaEntrega(isoDateOffset(1));
@@ -361,36 +367,29 @@ export default function RecordsPage() {
       const correo = esCorreoValido
         ? correoReal
         : `${base}.${plateQuery.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}@gmotors.local`;
-      const pass   = qCedula.trim() || qTelefono.trim() || 'openmotor123';
-
-      // 1. Crear cliente
-      await authApi.register({
+      const clienteRegistrado = quickClient ?? (await usuariosApi.createClient({
         nombre_completo: qNombre.trim(),
-        nombre_usuario:  `${base}_${Math.floor(Math.random() * 9000 + 1000)}`,
+        nombre_usuario: `${base}_${Math.floor(Math.random() * 9000 + 1000)}`,
         correo,
-        contrasena:      pass,
-        descripcion:     `CEDULA: ${qCedula.trim()} | TELEFONO: ${qTelefono.trim()}`,
-        direccion:       qDireccion.trim(),
-        pais: 'Ecuador', ciudad: 'Ecuador',
-      });
-
-      // 2. Recuperar el nuevo cliente
-      const { data: freshUsers } = await usuariosApi.list();
-      const nuevo = (freshUsers as Usuario[]).find(u => u.correo === correo);
-      if (!nuevo?.id_usuario) throw new Error('No se pudo crear el cliente');
-
+        cedula: qCedula.trim(),
+        telefono: qTelefono.trim(),
+        direccion: qDireccion.trim(),
+        ciudad: 'Ecuador',
+      })).data;
+      setQuickClient(clienteRegistrado);
+      const nuevo = clienteRegistrado.usuario;
       // 3. Crear la moto a su nombre
       const { data: nuevaMoto } = await motosApi.create({
         placa:       plateQuery.trim().toUpperCase(),
         marca:       qMarca.trim(),
         modelo:      qModelo.trim(),
         anio:        new Date().getFullYear(),
-        tipo_moto:   qTipoMoto,
+        tipo_vehiculo:   qTipoMoto,
         kilometraje: 0,
         id_usuario:  nuevo.id_usuario,
       });
 
-      toast.success('Cliente y vehículo creados — el cliente puede completar sus datos luego');
+      toast.success('Cliente y vehículo creados');
       // Refrescar listas y seleccionar
       const [uRes, mRes] = await Promise.allSettled([usuariosApi.list(), motosApi.list()]);
       if (uRes.status === 'fulfilled') setUsuarios(uRes.value.data as Usuario[]);
@@ -431,7 +430,7 @@ export default function RecordsPage() {
       await registrosApi.create({
         idCliente:   cliente.id_usuario,
         idEncargado: me.id_usuario,
-        idMoto:      nMoto.id_moto,
+        id_vehiculo: nMoto.id_vehiculo,
         idTipo:      tipo.id_tipo,
         estado:      1, // arranca En proceso — el precio se agrega después
         fecha:        nFecha,
@@ -622,13 +621,13 @@ export default function RecordsPage() {
       </div>
 
       <!-- FOTO MOTO + PLACA -->
-      ${r.ruta_imagen_moto ? `
+      ${r.ruta_imagen_vehiculo ? `
       <div style="position:relative;border-radius:14px;overflow:hidden;height:140px;margin:14px 0;border:1px solid #EEF1F5">
-        <img src="${r.ruta_imagen_moto}" alt="${r.placa}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.style.display='none'">
+        <img src="${r.ruta_imagen_vehiculo}" alt="${r.placa}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.style.display='none'">
         <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(12,12,16,0.85) 0%,rgba(12,12,16,0.3) 60%,transparent 100%)"></div>
         <div style="position:absolute;inset:0;padding:16px 20px;display:flex;flex-direction:column;justify-content:flex-end">
           <span style="font-family:'Courier New',monospace;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.5)">${r.placa ?? '—'}</span>
-          <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.75);margin-top:3px">${r.marca_moto ?? ''} ${r.modelo_moto ?? ''} · ${r.tipo_servicio ?? 'Servicio'}</span>
+          <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.75);margin-top:3px">${r.marca_vehiculo ?? ''} ${r.modelo_vehiculo ?? ''} · ${r.tipo_servicio ?? 'Servicio'}</span>
         </div>
         <span style="position:absolute;top:14px;right:14px;font-size:10px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(12,12,16,0.6);color:rgba(255,255,255,0.75);letter-spacing:.1em;text-transform:uppercase;backdrop-filter:blur(4px)">${estLabel}</span>
       </div>
@@ -643,7 +642,7 @@ export default function RecordsPage() {
       <div class="section-title">Información del cliente</div>
       <div class="info-grid">
         <div class="info-field"><label>Cliente</label><span style="font-size:15px">${r.nombre_cliente ?? '—'}</span></div>
-        <div class="info-field"><label>Vehículo</label><span>${r.marca_moto ?? ''} ${r.modelo_moto ?? ''}</span></div>
+        <div class="info-field"><label>Vehículo</label><span>${r.marca_vehiculo ?? ''} ${r.modelo_vehiculo ?? ''}</span></div>
         ${ciCli ? `<div class="info-field"><label>Cédula / RUC</label><span>${ciCli}</span></div>` : ''}
         ${telCli ? `<div class="info-field"><label>Teléfono</label><span>${telCli}</span></div>` : ''}
         ${correoCli ? `<div class="info-field full"><label>Correo</label><span style="font-size:12px;word-break:break-word">${correoCli}</span></div>` : ''}
@@ -749,7 +748,7 @@ export default function RecordsPage() {
         ).join('');
         return `<section>
           <div class="service-head"><strong>${fmtDate(item.fecha)} · ${item.placa}</strong><strong>${fmtMoney(item.costo_total || 0)}</strong></div>
-          <div class="meta">${item.marca_moto || ''} ${item.modelo_moto || ''} · ${item.kilometraje?.toLocaleString('es-EC') || 'S/D'} km · ${ESTADO_REGISTRO[item.estado]?.label || 'Registrado'}</div>
+          <div class="meta">${item.marca_vehiculo || ''} ${item.modelo_vehiculo || ''} · ${item.kilometraje?.toLocaleString('es-EC') || 'S/D'} km · ${ESTADO_REGISTRO[item.estado]?.label || 'Registrado'}</div>
           <p><b>${item.tipo_servicio || 'Servicio'}:</b> ${item.observaciones || item.descripcion || 'Sin observaciones'}</p>
           ${item.fecha_entrega_estimada ? `<p><b>Entrega estimada:</b> ${fmtDate(item.fecha_entrega_estimada)}</p>` : ''}
           ${detail ? `<ul>${detail}</ul>` : ''}
@@ -1084,7 +1083,15 @@ export default function RecordsPage() {
       >
         <div className="space-y-5">
 
-          {/* 1 · Buscar moto por PLACA (lo que manda) */}
+          {quickClient && (
+            <div className="rounded-xl border border-gm-border bg-gm-bg p-4 text-sm text-gm-text">
+              <p className="font-semibold">Acceso temporal del cliente</p>
+              <p>Usuario {quickClient.credencialTemporal.nombreUsuario}</p>
+              <p>Contraseña <code className="break-all">{quickClient.credencialTemporal.contrasena}</code></p>
+              <p className="mt-1 text-gm-muted">Entrega estos datos al cliente antes de cerrar la orden.</p>
+            </div>
+          )}
+          {/* 1 · Buscar vehículo por placa */}
           {!nMoto ? (
             <div>
               <label className="text-xs font-semibold dark:text-white/50 text-slate-900/50 uppercase tracking-wider block mb-1.5">
@@ -1110,7 +1117,7 @@ export default function RecordsPage() {
                       const owner = usuarios.find(u => u.id_usuario === m.id_usuario);
                       return (
                         <button
-                          key={m.id_moto}
+                          key={m.id_vehiculo}
                           onClick={() => selectMotoByPlate(m)}
                           className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all bg-white/[0.02] border-white/[0.06] hover:border-gm-red/40"
                         >
@@ -1132,7 +1139,7 @@ export default function RecordsPage() {
                       </p>
                       <button
                         type="button"
-                        onClick={() => { setShowQuick(true); setQNombre(''); }}
+                        onClick={() => { setQuickClient(null); setShowQuick(true); setQNombre(''); }}
                         className="flex items-center gap-2 text-[12px] font-bold px-3 py-2 rounded-lg"
                         style={{ background: 'rgba(225,20,40,0.12)', border: '1px solid rgba(225,20,40,0.35)', color: '#FF6470' }}
                       >

@@ -39,7 +39,7 @@ function colorXTipo(tipo: string) {
 }
 
 interface FormState {
-  id_moto:          string;
+  id_vehiculo:          string;
   fecha:            string;
   tipo_combustible: string;
   litros:           string;
@@ -51,7 +51,7 @@ interface FormState {
 
 function emptyForm(): FormState {
   return {
-    id_moto: '', fecha: new Date().toISOString().slice(0, 10),
+    id_vehiculo: '', fecha: new Date().toISOString().slice(0, 10),
     tipo_combustible: 'extra', litros: '', costo_total: '',
     km_actual: '', km_anterior: '', notas: '',
   };
@@ -81,7 +81,7 @@ export default function CombustiblePage() {
     if (isAdmin || isMecanico) {
       combustibleApi.list().then(r => setLogs(r.data as CargaCombustible[])).catch(() => {});
     } else {
-      Promise.allSettled(misMotos.map(m => combustibleApi.byMoto(m.id_moto)))
+      Promise.allSettled(misMotos.map(m => combustibleApi.byMoto(m.id_vehiculo)))
         .then(res => {
           const all: CargaCombustible[] = [];
           res.forEach(r => { if (r.status === 'fulfilled') all.push(...(r.value.data as CargaCombustible[])); });
@@ -97,7 +97,7 @@ export default function CombustiblePage() {
       const mine = (isAdmin || isMecanico) ? all : all.filter(m => m.id_usuario === user?.id_usuario);
       setMotos(mine);
       // Preserva la moto ya seleccionada (no pisa la elección del usuario en cada poll)
-      setSelMoto(prev => prev ?? (mine.length > 0 ? mine[0].id_moto : null));
+      setSelMoto(prev => prev ?? (mine.length > 0 ? mine[0].id_vehiculo : null));
       cargarLogs(mine);
     } catch { /* silencioso */ }
     if (isAdmin || isMecanico) {
@@ -116,13 +116,13 @@ export default function CombustiblePage() {
   /* Refresco en tiempo real de cargas de combustible */
   usePolling(recargar, { intervalMs: 30_000 });
 
-  /* Dueño (nombre + correo) por id_moto — para la vista de admin */
+  /* Dueño (nombre + correo) por id_vehiculo — para la vista de admin */
   const ownerByMoto = useMemo(() => {
     const uById = new Map(usuarios.map(u => [u.id_usuario, u]));
     const map = new Map<number, { nombre: string; correo: string }>();
     motos.forEach(m => {
       const u = uById.get(m.id_usuario);
-      map.set(m.id_moto, { nombre: u?.nombre_completo ?? '—', correo: u?.correo ?? '—' });
+      map.set(m.id_vehiculo, { nombre: u?.nombre_completo ?? '—', correo: u?.correo ?? '—' });
     });
     return map;
   }, [motos, usuarios]);
@@ -131,7 +131,7 @@ export default function CombustiblePage() {
   const adminRows = useMemo(() => {
     const q = adminSearch.toLowerCase().trim();
     return logs
-      .map(l => ({ ...l, owner: ownerByMoto.get(l.id_moto) ?? { nombre: '—', correo: '—' } }))
+      .map(l => ({ ...l, owner: ownerByMoto.get(l.id_vehiculo) ?? { nombre: '—', correo: '—' } }))
       .filter(r => {
         if (!q) return true;
         return (
@@ -160,10 +160,10 @@ export default function CombustiblePage() {
 
   /* Al cambiar moto en el form: pre-llenar km_anterior con el km actual de esa moto */
   const onMotoChange = (motoId: string) => {
-    const moto = motos.find(m => m.id_moto === Number(motoId));
+    const moto = motos.find(m => m.id_vehiculo === Number(motoId));
     setForm(prev => ({
       ...prev,
-      id_moto: motoId,
+      id_vehiculo: motoId,
       km_anterior: moto && moto.kilometraje > 0 ? String(moto.kilometraje) : prev.km_anterior,
     }));
   };
@@ -172,8 +172,8 @@ export default function CombustiblePage() {
     const nuevoForm = emptyForm();
     /* Pre-seleccionar la moto del filtro activo */
     if (selMoto) {
-      const moto = motos.find(m => m.id_moto === selMoto);
-      nuevoForm.id_moto = String(selMoto);
+      const moto = motos.find(m => m.id_vehiculo === selMoto);
+      nuevoForm.id_vehiculo = String(selMoto);
       if (moto && moto.kilometraje > 0) nuevoForm.km_anterior = String(moto.kilometraje);
     }
     setForm(nuevoForm);
@@ -181,11 +181,11 @@ export default function CombustiblePage() {
   };
 
   const addLog = async () => {
-    if (!form.id_moto || !form.fecha || !form.litros) {
+    if (!form.id_vehiculo || !form.fecha || !form.litros) {
       toast.error('Completa: moto, fecha y galones cargados');
       return;
     }
-    const moto = motos.find(m => m.id_moto === Number(form.id_moto));
+    const moto = motos.find(m => m.id_vehiculo === Number(form.id_vehiculo));
     const galones   = Number(form.litros);
     const costoFinal = form.costo_total
       ? Number(form.costo_total)
@@ -196,7 +196,7 @@ export default function CombustiblePage() {
     setSaving(true);
     try {
       await combustibleApi.create({
-        id_moto:          Number(form.id_moto),
+        id_vehiculo:          Number(form.id_vehiculo),
         placa:            moto?.placa ?? '—',
         fecha:            form.fecha,
         litros:           galones,
@@ -210,9 +210,9 @@ export default function CombustiblePage() {
          Enviamos SOLO el kilometraje (update parcial en el backend) para nunca
          arrastrar datos viejos ni la foto — el backend conserva el resto. */
       if (moto && kmActual && kmActual > 0) {
-        await motosApi.update(moto.id_moto, { kilometraje: kmActual }).catch(() => {});
+        await motosApi.update(moto.id_vehiculo, { kilometraje: kmActual }).catch(() => {});
         /* Actualizar lista local de motos con el nuevo km */
-        setMotos(prev => prev.map(m => m.id_moto === moto.id_moto ? { ...m, kilometraje: kmActual } : m));
+        setMotos(prev => prev.map(m => m.id_vehiculo === moto.id_vehiculo ? { ...m, kilometraje: kmActual } : m));
       }
 
       const kmRec = kmActual && kmAnterior ? kmActual - kmAnterior : null;
@@ -238,7 +238,7 @@ export default function CombustiblePage() {
 
   /* ── Datos filtrados ── */
   const filtered = useMemo(() => logs.filter(l => {
-    const motoOk  = selMoto == null || l.id_moto === selMoto;
+    const motoOk  = selMoto == null || l.id_vehiculo === selMoto;
     const monthOk = !month || (typeof l.fecha === 'string' && l.fecha.startsWith(month));
     return motoOk && monthOk;
   }).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))), [logs, selMoto, month]);
@@ -327,7 +327,7 @@ export default function CombustiblePage() {
     }
   };
 
-  const selectedMoto = motos.find(m => m.id_moto === selMoto);
+  const selectedMoto = motos.find(m => m.id_vehiculo === selMoto);
   const costoEst = form.litros
     ? (Number(form.litros) * (precios[form.tipo_combustible] ?? precioXTipo(form.tipo_combustible))).toFixed(2)
     : '0.00';
@@ -426,7 +426,7 @@ export default function CombustiblePage() {
         >
           <option value="">Todas las motos</option>
           {motos.map(m => (
-            <option key={m.id_moto} value={m.id_moto}>
+            <option key={m.id_vehiculo} value={m.id_vehiculo}>
               {m.placa} — {m.marca} {m.modelo}
             </option>
           ))}
@@ -794,10 +794,10 @@ export default function CombustiblePage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">Moto *</label>
-                  <select className="gm-select-d w-full" value={form.id_moto}
+                  <select className="gm-select-d w-full" value={form.id_vehiculo}
                     onChange={e => onMotoChange(e.target.value)}>
                     <option value="">Seleccionar</option>
-                    {motos.map(m => <option key={m.id_moto} value={m.id_moto}>{m.placa} — {m.marca}</option>)}
+                    {motos.map(m => <option key={m.id_vehiculo} value={m.id_vehiculo}>{m.placa} — {m.marca}</option>)}
                   </select>
                 </div>
                 <div>
@@ -899,7 +899,7 @@ export default function CombustiblePage() {
               </button>
               <button
                 onClick={addLog}
-                disabled={saving || !form.id_moto || !form.fecha || !form.litros}
+                disabled={saving || !form.id_vehiculo || !form.fecha || !form.litros}
                 className="flex-1 py-2.5 rounded-xl font-bold text-sm dark:text-white text-slate-900 transition-all disabled:opacity-40"
                 style={{ background: '#E11428' }}
               >

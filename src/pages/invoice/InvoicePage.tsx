@@ -71,7 +71,7 @@ export default function InvoicePage() {
             // Creamos un "pseudo-registro" para que la UI no se rompa
             setReg({
               id_registro: 0,
-              id_moto: 0,
+              id_vehiculo: 0,
               id_factura: factura.id_factura,
               fecha: factura.fecha_emision || factura.fecha,
               estado: 4, // Facturado
@@ -82,9 +82,9 @@ export default function InvoicePage() {
               cliente_correo: factura.cliente_correo,
               cliente_direccion: factura.cliente_direccion,
               placa: 'VENTA DIRECTA',
-              marca_moto: 'Open Motors',
-              modelo_moto: 'Inventario',
-              ruta_imagen_moto: null,
+              marca_vehiculo: 'Open Motors',
+              modelo_vehiculo: 'Inventario',
+              ruta_imagen_vehiculo: null,
               descripcion: 'Venta de mostrador',
               tipo_servicio: 'Venta de inventario',
               kilometraje: null,
@@ -309,11 +309,11 @@ export default function InvoicePage() {
             </h2>
 
             {/* Hero foto moto */}
-            {reg.ruta_imagen_moto ? (
+            {reg.ruta_imagen_vehiculo ? (
               <div className="relative rounded-2xl overflow-hidden mb-3" style={{ height: 110 }}>
                 <img
-                  src={reg.ruta_imagen_moto}
-                  alt={`${reg.marca_moto} ${reg.modelo_moto}`}
+                  src={reg.ruta_imagen_vehiculo}
+                  alt={`${reg.marca_vehiculo} ${reg.modelo_vehiculo}`}
                   className="w-full h-full object-cover"
                   onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
                 />
@@ -323,7 +323,7 @@ export default function InvoicePage() {
                     {placa}
                   </span>
                   <span className="text-white/70 text-[11px] font-semibold mt-0.5">
-                    {reg.marca_moto} {reg.modelo_moto}
+                    {reg.marca_vehiculo} {reg.modelo_vehiculo}
                     {reg.kilometraje ? ` · ${reg.kilometraje.toLocaleString('es-EC')} km` : ''}
                   </span>
                 </div>
@@ -342,8 +342,8 @@ export default function InvoicePage() {
 
             <div className="grid grid-cols-3 gap-2">
               {([
-                ['Marca',  reg.marca_moto || '—'],
-                ['Modelo', reg.modelo_moto || '—'],
+                ['Marca',  reg.marca_vehiculo || '—'],
+                ['Modelo', reg.modelo_vehiculo || '—'],
                 ['Km',     reg.kilometraje ? `${reg.kilometraje.toLocaleString('es-EC')} km` : '—'],
               ] as [string,string][]).map(([k,v]) => (
                 <div key={k} className="p-2.5 rounded-xl text-center"

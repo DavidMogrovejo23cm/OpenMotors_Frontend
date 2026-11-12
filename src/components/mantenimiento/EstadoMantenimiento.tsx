@@ -47,7 +47,7 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
 
   /* Carga compartida desde el backend (100% nube, sin almacenamiento local) */
   const cargarServicios = () => {
-    mantenimientosApi.byMoto(moto.id_moto)
+    mantenimientosApi.byMoto(moto.id_vehiculo)
       .then(({ data }) => {
         const map: Record<string, number> = {};
         (data as MantenimientoApi[]).forEach(m => {
@@ -63,7 +63,7 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
         else setErrorServ(true);
       });
   };
-  useEffect(cargarServicios, [moto.id_moto]);
+  useEffect(cargarServicios, [moto.id_vehiculo]);
 
   const estado = useMemo(
     () => calcularEstadoLocal(moto.cilindraje, moto.kilometraje, servicios),
@@ -72,13 +72,13 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
 
   const marcarCambiado = (tipo: string) => {
     setServicios(s => ({ ...s, [tipo]: moto.kilometraje }));   // optimista
-    mantenimientosApi.registrar({ id_moto: moto.id_moto, tipo, km_servicio: moto.kilometraje })
+    mantenimientosApi.registrar({ id_vehiculo: moto.id_vehiculo, tipo, km_servicio: moto.kilometraje })
       .then(cargarServicios)
       .catch(() => { setErrorServ(true); cargarServicios(); }); // revierte si falla
   };
   const deshacer = (tipo: string) => {
     setServicios(s => { const n = { ...s }; delete n[tipo]; return n; });
-    mantenimientosApi.borrar(moto.id_moto, tipo)
+    mantenimientosApi.borrar(moto.id_vehiculo, tipo)
       .then(cargarServicios)
       .catch(() => { setErrorServ(true); cargarServicios(); });
   };

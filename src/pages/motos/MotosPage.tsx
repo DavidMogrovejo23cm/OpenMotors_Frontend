@@ -43,8 +43,8 @@ const schema = z.object({
   anio:               z.coerce.number().int().min(1980).max(new Date().getFullYear() + 1),
   marca:              z.string().min(2),
   modelo:             z.string().min(1),
-  nombre_moto:        z.string().optional(),
-  tipo_moto:          z.string().min(1, 'Selecciona el tipo'),
+  nombre_vehiculo:        z.string().optional(),
+  tipo_vehiculo:          z.string().min(1, 'Selecciona el tipo'),
   kilometraje:        z.coerce.number().int().nonnegative(),
   id_usuario:         z.coerce.number().positive('Selecciona un propietario'),
   /* La foto NO va en el formulario: se maneja aparte (imageFile) para no
@@ -84,7 +84,7 @@ function MotoCard({
   const navigate  = useNavigate();
   const cardRef   = useRef<HTMLDivElement>(null);
   const glowRef   = useRef<HTMLDivElement>(null);
-  const tc = getTipoConfig(moto.tipo_moto);
+  const tc = getTipoConfig(moto.tipo_vehiculo);
 
   /* Mouse parallax glow */
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -118,7 +118,7 @@ function MotoCard({
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
       onMouseMove={handleMove}
-      onClick={() => navigate(`/motos/${moto.id_moto}`)}
+      onClick={() => navigate(`/motos/${moto.id_vehiculo}`)}
     >
       {/* Glow layer */}
       <div ref={glowRef} className="moto-card-glow" />
@@ -131,7 +131,7 @@ function MotoCard({
         {/* Tipo badge */}
         <div className="moto-tipo-badge" style={{ background: tc.bg, borderColor: `${tc.color}35` }}>
           <span className="moto-tipo-dot" style={{ background: tc.color }} />
-          <span style={{ color: tc.color }}>{moto.tipo_moto}</span>
+          <span style={{ color: tc.color }}>{moto.tipo_vehiculo}</span>
         </div>
 
         {/* Acciones — solo para admin/mecánico */}
@@ -160,9 +160,9 @@ function MotoCard({
         <h3 className="moto-name">
           {moto.marca} <span className="moto-modelo">{moto.modelo}</span>
         </h3>
-        {moto.nombre_moto && (
+        {moto.nombre_vehiculo && (
           <p className="moto-alias">
-            <span className="moto-alias-quote">"</span>{moto.nombre_moto}<span className="moto-alias-quote">"</span>
+            <span className="moto-alias-quote">"</span>{moto.nombre_vehiculo}<span className="moto-alias-quote">"</span>
           </p>
         )}
       </div>
@@ -213,7 +213,7 @@ function MotoCard({
           <span className="moto-owner-name">{ownerName}</span>
         </div>
         <Link
-          to={`/diagnostico?moto_id=${moto.id_moto}`}
+          to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
           title="Ver / crear diagnóstico"
           onClick={e => e.stopPropagation()}
           style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: 'rgba(59,130,246,0.7)', textDecoration: 'none' }}
@@ -298,7 +298,7 @@ export default function MotosPage() {
     setImageFile(null); setImagePreview(null);
     reset({
       placa: m.placa, anio: m.anio, marca: m.marca, modelo: m.modelo,
-      nombre_moto: m.nombre_moto ?? '', tipo_moto: m.tipo_moto,
+      nombre_vehiculo: m.nombre_vehiculo ?? '', tipo_vehiculo: m.tipo_vehiculo,
       kilometraje: m.kilometraje, id_usuario: m.id_usuario,
     });
     setModalOpen(true);
@@ -308,7 +308,7 @@ export default function MotosPage() {
     setSaving(true);
     /* Capturamos el id de la moto editada UNA sola vez: así una foto SIEMPRE
        se guarda en la moto correcta, sin importar re-renders o cambios de estado. */
-    const motoIdEditada = editTarget?.id_moto ?? null;
+    const motoIdEditada = editTarget?.id_vehiculo ?? null;
     try {
       /* Foto comprimida en el dispositivo (instantáneo, sin servidor) */
       let fotoBase64: string | null = null;
@@ -316,19 +316,19 @@ export default function MotosPage() {
         try { fotoBase64 = await comprimirImagen(imageFile); } catch { /* se guarda sin foto */ }
       }
       if (motoIdEditada != null) {
-        /* data NUNCA incluye ruta_imagen_motos (no está en el schema) →
+        /* data NUNCA incluye ruta_imagen_vehiculo (no está en el schema) →
            editar km/marca/etc. jamás toca la foto de esta ni de otra moto. */
         await motosApi.update(motoIdEditada, data);
         if (fotoBase64) {
-          try { await motosApi.update(motoIdEditada, { ruta_imagen_motos: fotoBase64 }); }
+          try { await motosApi.update(motoIdEditada, { ruta_imagen_vehiculo: fotoBase64 }); }
           catch { toast.error('Datos guardados, pero la foto no (actualiza el backend a columna TEXT).'); }
         }
         toast.success('Vehículo actualizado');
       } else {
         const { data: nueva } = await motosApi.create(data);
         const creada = nueva as Moto;
-        if (fotoBase64 && creada?.id_moto) {
-          try { await motosApi.update(creada.id_moto, { ruta_imagen_motos: fotoBase64 }); }
+        if (fotoBase64 && creada?.id_vehiculo) {
+          try { await motosApi.update(creada.id_vehiculo, { ruta_imagen_vehiculo: fotoBase64 }); }
           catch { toast.error('Vehículo creado, pero la foto no se guardó (actualiza el backend a columna TEXT).'); }
         }
         toast.success('Vehículo registrado');
@@ -343,7 +343,7 @@ export default function MotosPage() {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await motosApi.remove(deleteTarget.id_moto);
+      await motosApi.remove(deleteTarget.id_vehiculo);
       toast.success('Vehículo eliminado');
       setDeleteTarget(null);
       fetchData();
@@ -361,13 +361,13 @@ export default function MotosPage() {
       m.marca.toLowerCase().includes(q) ||
       m.modelo.toLowerCase().includes(q) ||
       owner.includes(q);
-    const matchTipo = filterTipo === '' || m.tipo_moto === filterTipo;
+    const matchTipo = filterTipo === '' || m.tipo_vehiculo === filterTipo;
     return matchQ && matchTipo;
   });
 
   /* Stats summary */
   const totalKm = motos.reduce((a, b) => a + b.kilometraje, 0);
-  const tiposUnicos = [...new Set(motos.map((m) => m.tipo_moto))];
+  const tiposUnicos = [...new Set(motos.map((m) => m.tipo_vehiculo))];
 
   return (
     <div ref={pageRef} className="mp-root">
@@ -476,7 +476,7 @@ export default function MotosPage() {
             )
             : filtered.map((m, i) => (
               <MotoCard
-                key={m.id_moto}
+                key={m.id_vehiculo}
                 moto={m}
                 ownerName={ownerName(m.id_usuario)}
                 onEdit={openEdit}
@@ -548,7 +548,7 @@ export default function MotosPage() {
           <datalist id="marcas-ec">
             {MARCAS_EC.map((m) => <option key={m} value={m} />)}
           </datalist>
-          <Input label='Nombre del vehículo (opcional)' placeholder='"La Bestia"' {...register('nombre_moto')} />
+          <Input label='Nombre del vehículo (opcional)' placeholder='"La Bestia"' {...register('nombre_vehiculo')} />
 
           {/* Foto de la moto */}
           <div>
@@ -606,11 +606,11 @@ export default function MotosPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">Tipo de vehículo</label>
-              <select className="gm-input-d" {...register('tipo_moto')}>
+              <select className="gm-input-d" {...register('tipo_vehiculo')}>
                 <option value="">Seleccionar</option>
-                {(editTarget && !TIPOS.includes(editTarget.tipo_moto) ? [...TIPOS, editTarget.tipo_moto] : TIPOS).map(t => <option key={t} value={t}>{t}</option>)}
+                {(editTarget && !TIPOS.includes(editTarget.tipo_vehiculo) ? [...TIPOS, editTarget.tipo_vehiculo] : TIPOS).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              {errors.tipo_moto && <p className="text-xs text-gm-red mt-1">{errors.tipo_moto.message}</p>}
+              {errors.tipo_vehiculo && <p className="text-xs text-gm-red mt-1">{errors.tipo_vehiculo.message}</p>}
             </div>
             <Input label="Kilometraje" type="number" placeholder="0" error={errors.kilometraje?.message} {...register('kilometraje')} />
           </div>

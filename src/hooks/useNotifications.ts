@@ -143,14 +143,14 @@ export function useNotifications() {
         const kmSince = lastKm != null ? m.kilometraje - lastKm : null;
         if (kmSince != null && kmSince >= thr) {
           add({
-            id: genId('oil', m.id_moto), type: 'oil_alert', priority: 'high', read: false, createdAt: today,
+            id: genId('oil', m.id_vehiculo), type: 'oil_alert', priority: 'high', read: false, createdAt: today,
             title: `Cambio de aceite vencido — ${m.placa}`,
             message: `${m.marca} ${m.modelo}: ${(kmSince - thr).toLocaleString()} km de retraso`,
             link: '/alertas',
           });
         } else if (kmSince != null && kmSince >= thr * 0.8) {
           add({
-            id: genId('oil_soon', m.id_moto), type: 'oil_alert', priority: 'medium', read: false, createdAt: today,
+            id: genId('oil_soon', m.id_vehiculo), type: 'oil_alert', priority: 'medium', read: false, createdAt: today,
             title: `Cambio de aceite próximo — ${m.placa}`,
             message: `${m.marca} ${m.modelo}: faltan ${(thr - kmSince).toLocaleString()} km`,
             link: '/alertas',

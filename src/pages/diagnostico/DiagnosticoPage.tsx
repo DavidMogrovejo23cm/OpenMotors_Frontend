@@ -14,7 +14,7 @@ import { motosApi, diagnosticosApi, usuariosApi } from '../../lib/api';
 import { usePolling } from '../../hooks/usePolling';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { getErrorMsg } from '../../lib/utils';
+import { nivelDiagnostico, getErrorMsg } from '../../lib/utils';
 import { useTheme } from '../../lib/theme';
 import type { Moto, Usuario, DiagnosticoMoto, DetalleDiagnostico } from '../../types';
 
@@ -47,10 +47,10 @@ function DiagnosticoCard({ d, motos, usuarios }: { d: DiagnosticoMoto; motos: Mo
   const [theme] = useTheme();
   const isDark = theme === 'dark';
   const [open, setOpen] = useState(false);
-  const moto = motos.find(m => m.id_moto === d.id_moto);
+  const moto = motos.find(m => m.id_vehiculo === d.id_vehiculo);
   const mec  = usuarios.find(u => u.id_usuario === d.id_mecanico);
 
-  const worst = d.detalles.reduce((a, b) => Math.max(a, b.estado), 1) as 1 | 2 | 3;
+  const worst = d.detalles.reduce((a, b) => Math.max(a, nivelDiagnostico(b.estado)), 1) as 1 | 2 | 3;
   const ec = ESTADO_CONFIG[worst];
 
   return (
@@ -64,7 +64,7 @@ function DiagnosticoCard({ d, motos, usuarios }: { d: DiagnosticoMoto; motos: Mo
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 700, fontSize: 14, margin: 0 }}>
-            {moto ? `${moto.marca} ${moto.modelo}` : `Vehículo #${d.id_moto}`}
+            {moto ? `${moto.marca} ${moto.modelo}` : `Vehículo #${d.id_vehiculo}`}
             <span style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(21,21,27,0.42)', fontSize: 12, fontWeight: 500, marginLeft: 8 }}>
               {moto?.placa}
             </span>
@@ -94,10 +94,10 @@ function DiagnosticoCard({ d, motos, usuarios }: { d: DiagnosticoMoto; motos: Mo
         <div style={{ padding: '0 18px 16px', borderTop: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid #E4E7EC' }}>
 
           {/* Foto de la moto + datos */}
-          {(moto?.ruta_imagen_motos && moto.ruta_imagen_motos !== 'Desconocido') && (
+          {(moto?.ruta_imagen_vehiculo && moto.ruta_imagen_vehiculo !== 'Desconocido') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0', padding: '10px 12px', background: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderRadius: 10, border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#E4E7EC'}` }}>
               <img
-                src={moto.ruta_imagen_motos}
+                src={moto.ruta_imagen_vehiculo}
                 alt={`${moto.marca} ${moto.modelo}`}
                 style={{ width: 72, height: 72, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `2px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E4E7EC'}` }}
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -121,7 +121,8 @@ function DiagnosticoCard({ d, motos, usuarios }: { d: DiagnosticoMoto; motos: Mo
           )}
           <div className="gm-respgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8, marginTop: 12 }}>
             {d.detalles.map(det => {
-              const pc = ESTADO_CONFIG[det.estado as 1 | 2 | 3];
+              const estado = nivelDiagnostico(det.estado);
+              const pc = ESTADO_CONFIG[estado];
               const part = PARTES.find(p => p.key === det.parte);
               return (
                 <div key={det.parte} style={{ background: pc.bg, border: `1px solid ${pc.border}`, borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -129,9 +130,9 @@ function DiagnosticoCard({ d, motos, usuarios }: { d: DiagnosticoMoto; motos: Mo
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: isDark ? '#EBEBEB' : '#15151B' }}>{part?.label ?? det.parte}</span>
-                      <EstadoIcon estado={det.estado as 1 | 2 | 3} />
+                      <EstadoIcon estado={estado} />
                     </div>
-                    <span style={{ fontSize: 10, color: pc.color, fontWeight: 700 }}>{pc.label}</span>
+                    <span style={{ fontSize: 10, color: pc.color, fontWeight: 700 }}>{det.estado === "CRITICO" ? "Crítico" : pc.label}</span>
                     {det.observacion && (
                       <p style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(21,21,27,0.6)', margin: '4px 0 0', lineHeight: 1.4 }}>{det.observacion}</p>
                     )}
@@ -172,6 +173,20 @@ export default function DiagnosticoPage() {
   const [motoSel,     setMotoSel]     = useState<Moto | null>(null);
   const [kmIngreso,   setKmIngreso]   = useState('');
   const [obsGen,      setObsGen]      = useState('');
+  const [plantilla, setPlantilla] = useState(PARTES);
+  useEffect(() => {
+    let active = true;
+    diagnosticosApi.plantilla().then(({ data }) => {
+      if (active && Array.isArray(data) && data.length) {
+        setPlantilla(data.map(({ sistema, nombre }) => ({
+          key: sistema,
+          label: nombre,
+          Icon: PARTES.find(p => p.key === sistema)?.Icon ?? ClipboardList,
+        })));
+      }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const [detalles,    setDetalles]    = useState<Record<string, { estado: 1|2|3; obs: string }>>(() =>
     Object.fromEntries(PARTES.map(p => [p.key, { estado: 1, obs: '' }]))
   );
@@ -186,8 +201,8 @@ export default function DiagnosticoPage() {
       const lista = m.value.data as Moto[];
       setMotos(lista);
       if (preselected.current) {
-        const found = lista.find(mo => mo.id_moto === parseInt(preselected.current!));
-        if (found) { setMotoSel(found); setBusqueda(`${found.marca} ${found.modelo}`); }
+        const found = lista.find(mo => mo.id_vehiculo === parseInt(preselected.current!));
+        if (found) { setMotoSel(found); setKmIngreso(String(found.kilometraje)); setBusqueda(`${found.marca} ${found.modelo}`); }
       }
     }
     if (u.status === 'fulfilled') setUsuarios(u.value.data as Usuario[]);
@@ -218,16 +233,18 @@ export default function DiagnosticoPage() {
   const handleGuardar = async () => {
     if (!motoSel || !user) return;
     const km = parseInt(kmIngreso);
-    if (!km || km < 0) { toast.error('Ingresa el kilometraje de ingreso', 'Error'); return; }
+    if (!Number.isInteger(km) || km < 0) { toast.error('Ingresa el kilometraje de ingreso', 'Error'); return; }
 
-    const detList: DetalleDiagnostico[] = PARTES.map(p => ({
+    const estados = { 1: "BUENO", 2: "REGULAR", 3: "MALO" } as const;
+    const detList: DetalleDiagnostico[] = plantilla.map(p => ({
       parte:       p.key,
-      estado:      detalles[p.key].estado,
-      observacion: detalles[p.key].obs || null,
+      sistema:     p.key,
+      estado:      estados[detalles[p.key]?.estado ?? 1],
+      observacion: detalles[p.key]?.obs || null,
     }));
 
     const diagnostico: DiagnosticoMoto = {
-      id_moto:                  motoSel.id_moto,
+      id_vehiculo:                  motoSel.id_vehiculo,
       id_mecanico:              user.id_usuario,
       kilometraje_ingreso:      km,
       observaciones_generales:  obsGen || null,
@@ -246,8 +263,8 @@ export default function DiagnosticoPage() {
         motoLabel: `${motoSel.marca} ${motoSel.modelo}`,
         placa:     motoSel.placa,
         correo:    owner?.correo ?? '',
-        malos:     PARTES.filter(p => detalles[p.key].estado === 3).map(p => ({ label: p.label, obs: detalles[p.key].obs })),
-        regulares: PARTES.filter(p => detalles[p.key].estado === 2).map(p => ({ label: p.label, obs: detalles[p.key].obs })),
+        malos:     plantilla.filter(p => detalles[p.key]?.estado === 3).map(p => ({ label: p.label, obs: detalles[p.key].obs })),
+        regulares: plantilla.filter(p => detalles[p.key]?.estado === 2).map(p => ({ label: p.label, obs: detalles[p.key].obs })),
       });
       // Reset form
       setMotoSel(null);
@@ -371,13 +388,13 @@ export default function DiagnosticoPage() {
                 ) : motosFiltradas.map(m => {
                   const owner = usuarios.find(u => u.id_usuario === m.id_usuario);
                   return (
-                    <div key={m.id_moto} onClick={() => { setMotoSel(m); setKmIngreso(String(m.kilometraje)); setBusqueda(''); }}
+                    <div key={m.id_vehiculo} onClick={() => { setMotoSel(m); setKmIngreso(String(m.kilometraje)); setBusqueda(''); }}
                       style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'center', borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid #E4E7EC', background: isDark ? '#16161E' : '#FFFFFF' }}
                       onMouseEnter={e => (e.currentTarget.style.background = isDark ? '#1E1E2A' : '#F0F1F3')}
                       onMouseLeave={e => (e.currentTarget.style.background = isDark ? '#16161E' : '#FFFFFF')}
                     >
-                      {m.ruta_imagen_motos && m.ruta_imagen_motos !== 'Desconocido' ? (
-                        <img src={m.ruta_imagen_motos} alt={m.placa} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                      {m.ruta_imagen_vehiculo && m.ruta_imagen_vehiculo !== 'Desconocido' ? (
+                        <img src={m.ruta_imagen_vehiculo} alt={m.placa} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                       ) : (
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Car size={16} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.3)'} />
@@ -399,8 +416,8 @@ export default function DiagnosticoPage() {
         ) : (
           /* Moto seleccionada */
           <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 14 }}>
-            {motoSel.ruta_imagen_motos && motoSel.ruta_imagen_motos !== 'Desconocido' ? (
-              <img src={motoSel.ruta_imagen_motos} alt={motoSel.placa} style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+            {motoSel.ruta_imagen_vehiculo && motoSel.ruta_imagen_vehiculo !== 'Desconocido' ? (
+              <img src={motoSel.ruta_imagen_vehiculo} alt={motoSel.placa} style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
             ) : (
               <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Car size={22} color="#3B82F6" />
@@ -409,7 +426,7 @@ export default function DiagnosticoPage() {
             <div style={{ flex: 1 }}>
               <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontSize: 14, fontWeight: 800, margin: 0 }}>{motoSel.marca} {motoSel.modelo}</p>
               <p style={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(21,21,27,0.5)', fontSize: 12, margin: 0 }}>
-                {motoSel.placa} · {motoSel.tipo_moto}
+                {motoSel.placa} · {motoSel.tipo_vehiculo}
               </p>
             </div>
             <button onClick={() => setMotoSel(null)}
@@ -446,8 +463,8 @@ export default function DiagnosticoPage() {
         <div>
           <label style={{ ...lbl, marginBottom: 12 }}>Estado de cada componente</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {PARTES.map(parte => {
-              const det = detalles[parte.key];
+            {plantilla.map(parte => {
+              const det = detalles[parte.key] ?? { estado: 1, obs: "" };
               const ec  = ESTADO_CONFIG[det.estado];
               return (
                 <div key={parte.key} style={{ background: isDark ? '#16161E' : '#F8F9FB', borderRadius: 12, border: `1px solid ${ec.border}`, padding: '12px 14px' }}>

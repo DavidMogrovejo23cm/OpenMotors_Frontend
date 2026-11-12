@@ -961,7 +961,7 @@ export default function ContabilidadPage() {
                   return {
                     id_registro: -f.id_factura,
                     id_cliente: 0,
-                    id_moto: 0,
+                    id_vehiculo: 0,
                     id_encargado: 0,
                     id_factura: f.id_factura,
                     fecha: f.fecha,
@@ -974,9 +974,9 @@ export default function ContabilidadPage() {
                     placa: 'Venta directa',
                     tipo_servicio: info.detalle
                     ,nombre_cliente: f.cliente_nombre || 'Consumidor final'
-                    ,marca_moto: 'Open Motors'
-                    ,modelo_moto: 'Inventario'
-                    ,ruta_imagen_moto: null
+                    ,marca_vehiculo: 'Open Motors'
+                    ,modelo_vehiculo: 'Inventario'
+                    ,ruta_imagen_vehiculo: null
                     ,descripcion: info.detalle
                   } as RegistroDetalle;
                 });

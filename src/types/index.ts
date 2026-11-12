@@ -39,17 +39,17 @@ export interface UsuarioRol {
 }
 
 export interface Moto {
-  id_moto:           number;
+  id_vehiculo:           number;
   placa:             string;
   anio:              number;
   marca:             string;
   modelo:            string;
-  nombre_moto:       string | null;
-  tipo_moto:         string;
+  nombre_vehiculo:       string | null;
+  tipo_vehiculo:         string;
   kilometraje:       number;
   cilindraje:        number;
   id_usuario:        number;
-  ruta_imagen_motos: string | null;
+  ruta_imagen_vehiculo: string | null;
 }
 
 export interface Categoria {
@@ -119,13 +119,13 @@ export interface Registro {
   id_encargado: number;
   id_cliente:   number;
   id_tipo:      number;
-  id_moto:      number;
+  id_vehiculo:      number;
   kilometraje:  number | null;
 }
 
 export interface RegistroDetalle {
   id_registro:      number;
-  id_moto?:         number;
+  id_vehiculo?:         number;
   id_cliente?:      number;
   id_encargado?:    number;
   nombre_cliente:   string;
@@ -134,10 +134,10 @@ export interface RegistroDetalle {
   cliente_correo?:  string | null;
   cliente_direccion?: string | null;
   nombre_encargado?: string;
-  marca_moto:       string;
-  modelo_moto:      string;
+  marca_vehiculo:       string;
+  modelo_vehiculo:      string;
   placa:            string;
-  ruta_imagen_moto: string | null;
+  ruta_imagen_vehiculo: string | null;
   fecha:            string;
   fecha_entrega_estimada?: string | null;
   fecha_completado?: string | null;
@@ -184,7 +184,7 @@ export interface HistorialPuntos {
 /* ─── Combustible ─── */
 export interface CargaCombustible {
   id:          number;
-  id_moto:     number;
+  id_vehiculo:     number;
   placa:       string;
   fecha:       string;
   litros:      number;
@@ -211,13 +211,14 @@ export interface MotoAlerta {
 export interface DetalleDiagnostico {
   id_detalle?:  number;
   parte:        string;   // MOTOR | TRANSMISION | FRENOS | LLANTAS | SUSPENSION | ELECTRICO | CARROCERIA | REFRIGERACION
-  estado:       1 | 2 | 3; // 1=BUENO 2=REGULAR 3=MALO
+  estado:       "BUENO" | "REGULAR" | "MALO" | "CRITICO" | 1 | 2 | 3;
+  sistema?:     string;
   observacion?: string | null;
 }
 
 export interface DiagnosticoMoto {
   id_diagnostico?:         number;
-  id_moto:                 number;
+  id_vehiculo:                 number;
   id_mecanico:             number;
   fecha?:                  string;
   kilometraje_ingreso:     number;

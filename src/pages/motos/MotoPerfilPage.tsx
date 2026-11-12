@@ -14,7 +14,7 @@ import {
 import { motosApi, diagnosticosApi, usuariosApi, registrosApi } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePolling } from '../../hooks/usePolling';
-import { fmtMoney, fmtDate, toIsoStr, ESTADO_REGISTRO } from '../../lib/utils';
+import { nivelDiagnostico, fmtMoney, fmtDate, toIsoStr, ESTADO_REGISTRO } from '../../lib/utils';
 import type { Moto, Usuario, DiagnosticoMoto, RegistroDetalle } from '../../types';
 import { EstadoMotoLive } from '../../components/mantenimiento/EstadoMantenimiento';
 import { imagenMoto } from '../../lib/fotos';
@@ -48,7 +48,7 @@ function DiagCard({ d, usuarios }: { d: DiagnosticoMoto; usuarios: Usuario[] }) 
   const [theme] = useTheme();
   const isDark = theme === 'dark';
   const mec  = usuarios.find(u => u.id_usuario === d.id_mecanico);
-  const worst = (d.detalles ?? []).reduce((a, b) => Math.max(a, b.estado), 1) as 1 | 2 | 3;
+  const worst = (d.detalles ?? []).reduce((a, b) => Math.max(a, nivelDiagnostico(b.estado)), 1) as 1 | 2 | 3;
   const ec   = ESTADO_CFG[worst];
 
   return (
@@ -93,7 +93,7 @@ function DiagCard({ d, usuarios }: { d: DiagnosticoMoto; usuarios: Usuario[] }) 
       {open && (d.detalles ?? []).length > 0 && (
         <div className="gm-respgrid" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : '#E4E7EC'}`, padding: '12px 18px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: 8 }}>
           {(d.detalles ?? []).map(det => {
-            const pc   = ESTADO_CFG[det.estado as 1 | 2 | 3];
+            const pc   = ESTADO_CFG[nivelDiagnostico(det.estado)];
             const Icon = PARTES_ICON[det.parte] ?? Cog;
             const lbl  = PARTES_LABEL[det.parte] ?? det.parte;
             return (
@@ -101,9 +101,9 @@ function DiagCard({ d, usuarios }: { d: DiagnosticoMoto; usuarios: Usuario[] }) 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
                   <Icon size={13} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.6)'} />
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: isDark ? '#EBEBEB' : '#15151B' }}>{lbl}</span>
-                  {det.estado === 1
+                  {nivelDiagnostico(det.estado) === 1
                     ? <CheckCircle  size={11} color="#10B981" style={{ marginLeft: 'auto' }} />
-                    : det.estado === 2
+                    : nivelDiagnostico(det.estado) === 2
                       ? <AlertTriangle size={11} color="#F59E0B" style={{ marginLeft: 'auto' }} />
                       : <XCircle      size={11} color="#E11428" style={{ marginLeft: 'auto' }} />
                   }
@@ -213,7 +213,7 @@ export default function MotoPerfilPage() {
     );
   }
 
-  const tc       = getTipoColor(moto.tipo_moto);
+  const tc       = getTipoColor(moto.tipo_vehiculo);
   const anioActual = new Date().getFullYear();
   const antiguedad = anioActual - moto.anio;
 
@@ -266,7 +266,7 @@ export default function MotoPerfilPage() {
               {/* Tipo badge */}
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: tc, background: `${tc}15`, border: `1px solid ${tc}30`, borderRadius: 99, padding: '3px 10px', marginBottom: 10 }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: tc, flexShrink: 0 }} />
-                {moto.tipo_moto}
+                {moto.tipo_vehiculo}
               </div>
 
               {/* Placa + nombre */}
@@ -278,9 +278,9 @@ export default function MotoPerfilPage() {
               <h1 style={{ color: ct, fontWeight: 800, fontSize: 24, margin: '0 0 2px', letterSpacing: '-0.03em' }}>
                 {moto.marca} <span style={{ color: cm }}>{moto.modelo}</span>
               </h1>
-              {moto.nombre_moto && (
+              {moto.nombre_vehiculo && (
                 <p style={{ color: cs, fontSize: 13, margin: 0 }}>
-                  "{moto.nombre_moto}"
+                  "{moto.nombre_vehiculo}"
                 </p>
               )}
             </div>
@@ -289,7 +289,7 @@ export default function MotoPerfilPage() {
             {canManage && (
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 <Link
-                  to={`/diagnostico?moto_id=${moto.id_moto}`}
+                  to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#fff', background: '#3B82F6', border: 'none', borderRadius: 9, padding: '8px 16px', textDecoration: 'none', cursor: 'pointer' }}
                 >
                   <Plus size={13} /> Diagnóstico
@@ -436,7 +436,7 @@ export default function MotoPerfilPage() {
           </div>
           {canManage && (
             <Link
-              to={`/diagnostico?moto_id=${moto.id_moto}`}
+              to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'rgba(59,130,246,0.8)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '6px 14px', textDecoration: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.18)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.10)')}
@@ -464,7 +464,7 @@ export default function MotoPerfilPage() {
             </p>
             {canManage && (
               <Link
-                to={`/diagnostico?moto_id=${moto.id_moto}`}
+                to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#3B82F6', borderRadius: 9, padding: '9px 20px', textDecoration: 'none' }}
               >
                 <Plus size={13} /> Crear diagnóstico
@@ -474,7 +474,7 @@ export default function MotoPerfilPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {historial.map(d => (
-              <DiagCard key={d.id_diagnostico ?? `${d.id_moto}-${d.fecha}`} d={d} usuarios={usuarios} />
+              <DiagCard key={d.id_diagnostico ?? `${d.id_vehiculo}-${d.fecha}`} d={d} usuarios={usuarios} />
             ))}
           </div>
         )}

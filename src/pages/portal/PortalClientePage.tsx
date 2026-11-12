@@ -40,8 +40,9 @@ export default function PortalClientePage() {
   const [filterPlaca, setFilterPlaca] = useState('');
   const load = useCallback(async () => {
     const uid = user?.id_usuario;
+    if (uid == null) { setLoading(false); return; }
     const [mr, rr] = await Promise.allSettled([
-      motosApi.list(), registrosApi.list(),
+      motosApi.byUser(uid), registrosApi.byClient(uid),
     ]);
     const allMotos:    Moto[]            = mr.status === 'fulfilled' ? mr.value.data : [];
     const allRegistros:RegistroDetalle[] = rr.status === 'fulfilled' ? rr.value.data : [];
@@ -142,12 +143,12 @@ export default function PortalClientePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {motos.map(m => {
-              const alert = oilAlerts.find(a => a.moto.id_moto === m.id_moto);
+              const alert = oilAlerts.find(a => a.moto.id_vehiculo === m.id_vehiculo);
               const cfg   = URGENCY_CFG[alert?.urgency ?? 'ok'];
               const pct   = alert?.kmSince != null
                 ? Math.min(Math.round((alert.kmSince / alert.thr) * 100), 100) : 0;
               return (
-                <div key={m.id_moto} className="gm-card-d rounded-2xl p-4">
+                <div key={m.id_vehiculo} className="gm-card-d rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="plate-tag">{m.placa}</span>
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
@@ -156,7 +157,7 @@ export default function PortalClientePage() {
                     </span>
                   </div>
                   <p className="dark:text-white/85 text-slate-900/85 font-black text-sm">{m.marca} {m.modelo}</p>
-                  <p className="dark:text-white/35 text-slate-900/35 text-xs mt-0.5">{m.anio} · {m.tipo_moto}</p>
+                  <p className="dark:text-white/35 text-slate-900/35 text-xs mt-0.5">{m.anio} · {m.tipo_vehiculo}</p>
                   <p className="dark:text-white/50 text-slate-900/50 text-xs mt-1">
                     {(m.kilometraje ?? 0).toLocaleString()} km totales
                   </p>

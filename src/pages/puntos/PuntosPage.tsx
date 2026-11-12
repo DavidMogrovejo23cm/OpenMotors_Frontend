@@ -109,7 +109,7 @@ export default function PuntosPage() {
             return {
               id_registro: r.id_registro,
               fecha:       r.fecha,
-              moto:        `${r.marca_moto} ${r.modelo_moto}`,
+              moto:        `${r.marca_vehiculo} ${r.modelo_vehiculo}`,
               placa:       r.placa,
               tipo:        r.tipo_servicio ?? '—',
               pts,
@@ -301,7 +301,7 @@ export default function PuntosPage() {
                     const pts = ptsForCc(cc);
                     const row = POINTS_TABLE.find(r => cc <= r.max);
                     return (
-                      <div key={m.id_moto} className="rounded-xl px-3 py-2.5"
+                      <div key={m.id_vehiculo} className="rounded-xl px-3 py-2.5"
                            style={{ background: `${row?.color ?? '#fff'}0A`, border: `1px solid ${row?.color ?? '#fff'}18` }}>
                         <span className="plate-tag text-[10px]">{m.placa}</span>
                         <p className="dark:text-white/80 text-slate-900/80 font-bold text-xs mt-1.5 truncate">{m.marca} {m.modelo}</p>

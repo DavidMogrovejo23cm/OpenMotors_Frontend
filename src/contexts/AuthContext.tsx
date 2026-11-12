@@ -190,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Procesa el FirebaseUser obtenido tras Google redirect.
-   * Intenta login con contraseña determinista; si falla, auto-registra.
+   * Inicia sesión con una cuenta existente.
    * No abre popup — el redirect ya fue manejado por LoginPage.
    */
   const processGoogleUserCb = useCallback(async (fbUser: FirebaseUser) => {
@@ -217,33 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (st >= 500) {
               throw new Error('El servidor tuvo un problema temporal. Intenta de nuevo.', { cause: loginErr });
             }
-            /* 2. 4xx (usuario no existe / credencial google no aplica) → registrar */
-            const base = (fbUser.email!.split('@')[0].replace(/[^a-z0-9]/gi, '').slice(0, 14) || 'gmuser');
-            try {
-              await authApi.register({
-                nombre_completo: fbUser.displayName || base,
-                nombre_usuario:  `${base}_g`,
-                correo:          fbUser.email!,
-                contrasena:      googlePass,
-                descripcion:     'CEDULA: N/A | TELEFONO: N/A',
-                pais:            'Ecuador',
-                ciudad:          'Ecuador',
-              });
-            } catch (regErr: unknown) {
-              const status = (regErr as { response?: { status: number } })?.response?.status;
-              if (status === 409 || status === 400) {
-                /* El correo ya existe con diferente contraseña */
-                throw new Error(
-                  'Este correo ya tiene cuenta. Ingresa con tu contraseña normal ' +
-                  'o usa "¿Olvidaste tu contraseña?" para restablecerla.',
-                  { cause: regErr }
-                );
-              }
-              throw regErr;
-            }
-            /* 3. Registro OK → login con la nueva cuenta */
-            const { data } = await authApi.login(fbUser.email!, googlePass);
-            ({ token, user } = extractAuth(data));
+            throw new Error('Ingresa con la contraseña de tu cuenta o contacta al taller para solicitar acceso.', { cause: loginErr });
           }
 
           /* Validar que recibimos sesión válida */

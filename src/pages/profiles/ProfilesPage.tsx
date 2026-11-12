@@ -11,7 +11,7 @@ import {
   ChevronRight, Wrench, Crown, User, X,
   Lock, Zap, Star, Activity, Trash2,
 } from "lucide-react";
-import { usuariosApi, rolesApi, authApi, motosApi } from "../../lib/api";
+import { usuariosApi, rolesApi, motosApi } from "../../lib/api";
 import { useTheme } from "../../lib/theme";
 import { useToast } from "../../components/ui/Toast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -65,7 +65,7 @@ const regSchema = z.object({
   nombre_completo: z.string().min(3),
   cedula:          z.string().min(10).max(13),
   nombre_usuario:  z.string().min(3),
-  contrasena:      z.string().min(4),
+  contrasena:      z.string().min(12, "Usa al menos 12 caracteres"),
   correo:          z.string().email().optional().or(z.literal("")),
   telefono:        z.string().min(7, "Teléfono mínimo 7 dígitos").max(15),
   direccion:       z.string().min(5, "Ingresa una dirección válida").max(300),
@@ -377,7 +377,12 @@ export default function ProfilesPage() {
     setSaving(true);
     try {
       /* cambiarCategoria reemplaza el rol actual — evita duplicados */
-      await rolesApi.cambiarCategoria(roleModal.user.id_usuario, selectedRol, me.id_usuario);
+      const currentRole = roleModal.user.roles?.find(rol => rol.estado === 1)?.idRol;
+      if (currentRole && currentRole !== selectedRol) {
+        await rolesApi.cambiarCategoria(roleModal.user.id_usuario, currentRole, selectedRol);
+      } else if (!currentRole) {
+        await rolesApi.assign(roleModal.user.id_usuario, selectedRol);
+      }
 
       /* Siempre guardar permisos en descripcion:
          - MECANICO → lista de módulos seleccionados
@@ -412,26 +417,29 @@ export default function ProfilesPage() {
     try {
       const correo = data.correo?.trim() || `${data.nombre_usuario}@gmotors.com`;
 
-      await authApi.register({
+      const { data: { usuario: newUser } } = await usuariosApi.createClient({
         nombre_completo: data.nombre_completo,
         nombre_usuario:  data.nombre_usuario,
         correo,
-        contrasena: data.contrasena,
-        descripcion: `CEDULA: ${data.cedula} | TELEFONO: ${data.telefono || "N/A"}`,
+        contrasena_temporal: data.contrasena,
+        cedula: data.cedula,
+        telefono: data.telefono,
         direccion: data.direccion.trim(),
-        pais: "Ecuador", ciudad: "Quito",
+        ciudad: "Quito",
       });
 
       // Aplicar el rol seleccionado si es distinto a CLIENTE (que es el rol por defecto)
       if (me && data.rol && data.rol !== "CLIENTE") {
         const roleObj = roles.find(r => r.nombre === data.rol);
         if (roleObj) {
-          // Obtener la lista fresca para conseguir el id_usuario del nuevo usuario
-          const { data: freshUsers } = await usuariosApi.list();
-          const newUser = (freshUsers as Usuario[]).find((u: Usuario) => u.correo === correo);
           if (newUser?.id_usuario) {
             // cambiarCategoria reemplaza el rol actual (CLIENTE → rol seleccionado)
-            await rolesApi.cambiarCategoria(newUser.id_usuario, roleObj.id_rol, me.id_usuario);
+            const clientRole = newUser.roles?.find(rol => rol.estado === 1)?.idRol;
+            if (clientRole && clientRole !== roleObj.id_rol) {
+              await rolesApi.cambiarCategoria(newUser.id_usuario, clientRole, roleObj.id_rol);
+            } else if (!clientRole) {
+              await rolesApi.assign(newUser.id_usuario, roleObj.id_rol);
+            }
           }
         }
       }
@@ -893,15 +901,15 @@ export default function ProfilesPage() {
                   <div className="space-y-2">
                     {sus.map(m => (
                       <button
-                        key={m.id_moto}
-                        onClick={() => { setViewClient(null); navigate(`/motos/${m.id_moto}`); }}
+                        key={m.id_vehiculo}
+                        onClick={() => { setViewClient(null); navigate(`/motos/${m.id_vehiculo}`); }}
                         className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-150"
                         style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(59,130,246,0.4)"; (e.currentTarget as HTMLElement).style.background = "rgba(59,130,246,0.06)"; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
                       >
-                        {m.ruta_imagen_motos && m.ruta_imagen_motos !== "Desconocido" ? (
-                          <img src={m.ruta_imagen_motos} alt={m.placa} className="w-11 h-11 rounded-lg object-cover shrink-0" />
+                        {m.ruta_imagen_vehiculo && m.ruta_imagen_vehiculo !== "Desconocido" ? (
+                          <img src={m.ruta_imagen_vehiculo} alt={m.placa} className="w-11 h-11 rounded-lg object-cover shrink-0" />
                         ) : (
                           <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
                             <Car size={18} className="dark:text-white/30 text-slate-900/30" />

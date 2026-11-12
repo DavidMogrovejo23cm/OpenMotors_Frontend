@@ -1,3 +1,4 @@
+import type { Usuario } from '../types';
 /* ─────────────────────────────────────────────
    GMotors — Capa de acceso a API
    Axios + interceptores de JWT
@@ -29,7 +30,6 @@ api.interceptors.request.use(
     // Security rechace el login antes de llegar al permitAll()
     const isPublic =
       url === '/usuarios/login' ||
-      (url === '/usuarios' && config.method?.toLowerCase() === 'post') ||
       url.includes('/recuperacion');
     if (token && !isPublic && config.headers) {
       if (typeof config.headers.set === 'function') {
@@ -80,11 +80,10 @@ api.interceptors.response.use(
   (res) => res,
   (err: AxiosError) => {
     const url = err.config?.url ?? '';
-    const method = (err.config?.method ?? '').toLowerCase();
+
     const isAuthPublico =
       url.includes('/usuarios/login') ||
-      url.includes('/usuarios/recuperacion') ||
-      (url.endsWith('/usuarios') && method === 'post');
+      url.includes('/usuarios/recuperacion');
 
     if (err.response?.status === 401 && !isAuthPublico) {
       // Cualquier 401 en endpoint protegido = token inválido → logout inmediato.
@@ -99,10 +98,11 @@ api.interceptors.response.use(
 
 /* ── Endpoints de autenticación ── */
 export const authApi = {
-  login:    (correo: string, contrasena: string) =>
-    api.post('/usuarios/login', { correo, contrasena }),
-  register: (data: Record<string, unknown>) =>
-    api.post('/usuarios', data),
+  login: (identificador: string, contrasena: string) =>
+    api.post('/usuarios/login', {
+      ...(identificador.includes('@') ? { correo: identificador } : { nombre_usuario: identificador }),
+      contrasena,
+    }),
   recover:  (correo: string) =>
     api.post('/usuarios/recuperacion/solicitar', { correo }),
   resetPassword: (token: string, nueva_contrasena: string) =>
@@ -111,6 +111,18 @@ export const authApi = {
 
 /* ── Usuarios ── */
 export const usuariosApi = {
+  createClient: (data: {
+    nombre_completo: string;
+    nombre_usuario: string;
+    correo: string;
+    contrasena_temporal?: string;
+    telefono?: string;
+    cedula?: string;
+    direccion?: string;
+    ciudad?: string;
+  }) => api.post<{ usuario: Usuario; credencialTemporal: { nombreUsuario: string; contrasena: string } }>(
+    '/usuarios/clientes', data,
+  ),
   list:    ()             => api.get('/usuarios'),
   get:     (id: number)  => api.get(`/usuarios/${id}`),
   update:  (id: number, data: Record<string, unknown>) => api.put(`/usuarios/${id}`, data),
@@ -128,17 +140,17 @@ export const usuariosApi = {
 
 /* ── Motos ── */
 export const motosApi = {
-  list:      ()            => api.get('/motos'),
-  get:       (id: number)  => api.get(`/motos/${id}`),
-  byUser:    (uid: number) => api.get(`/motos/usuario/${uid}`),
-  create:    (data: Record<string, unknown>) => api.post('/motos', data),
-  update:    (id: number, data: Record<string, unknown>) => api.put(`/motos/${id}`, data),
-  remove:    (id: number)  => api.delete(`/motos/${id}`),
+  list:      ()            => api.get('/vehiculos'),
+  get:       (id: number)  => api.get(`/vehiculos/${id}`),
+  byUser:    (uid: number) => api.get(`/vehiculos/usuario/${uid}`),
+  create:    (data: Record<string, unknown>) => api.post('/vehiculos', data),
+  update:    (id: number, data: Record<string, unknown>) => api.put(`/vehiculos/${id}`, data),
+  remove:    (id: number)  => api.delete(`/vehiculos/${id}`),
   upload: (form: FormData) => {
     const token = localStorage.getItem('gm_token');
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(`${BASE_URL}/motos/upload`, { method: 'POST', headers, body: form })
+    return fetch(`${BASE_URL}/vehiculos/upload`, { method: 'POST', headers, body: form })
       .then(res => res.json()).then(data => ({ data }));
   },
 };
@@ -193,13 +205,12 @@ export const categoriasApi = {
 /* ── Roles ── */
 export const rolesApi = {
   list:   () => api.get('/rol'),
-  assign: (usuarioId: number, rolId: number, adminId: number) =>
-    api.post('/usuario_rol/asignar', { usuarioId, rolId, adminId }),
-  revoke: (usuarioId: number, rolId: number, adminId: number) =>
-    api.delete('/usuario_rol/revocar', { data: { usuarioId, rolId, adminId } }),
-  /** Reemplaza el rol actual por nuevoRolId (un solo rol activo al salir). */
-  cambiarCategoria: (usuarioId: number, nuevoRolId: number, adminId: number) =>
-    api.post('/usuario_rol/cambiar-categoria', { usuarioId, nuevoRolId, adminId }),
+  assign: (id_usuario: number, id_rol: number) =>
+    api.post('/usuario_rol/asignar', { id_usuario, id_rol }),
+  revoke: (id_usuario: number, id_rol: number) =>
+    api.put('/usuario_rol/revocar', { id_usuario, id_rol }),
+  cambiarCategoria: (id_usuario: number, id_rol_actual: number, id_rol_nuevo: number) =>
+    api.put('/usuario_rol/cambiar-categoria', { id_usuario, id_rol_actual, id_rol_nuevo }),
 };
 
 /* ── Tipos de servicio ── */
@@ -236,30 +247,31 @@ export const rutasApi = {
 
 /* ── Diagnósticos mecánicos ── */
 export const diagnosticosApi = {
+  plantilla: () => api.get<{ sistema: string; nombre: string; partes_sugeridas: string[] }[]>('/diagnosticos/plantilla-8-sistemas'),
   create:     (data: Record<string, unknown>) => api.post('/diagnosticos', data),
-  byMoto:     (idMoto: number)     => api.get(`/diagnosticos/moto/${idMoto}`),
+  byMoto:     (idMoto: number)     => api.get(`/diagnosticos/vehiculo/${idMoto}`),
   byMecanico: (idMecanico: number) => api.get(`/diagnosticos/mecanico/${idMecanico}`),
   get:        (id: number)         => api.get(`/diagnosticos/${id}`),
 };
 
 /* ── Alertas y estado de mantenimiento ── */
 export const alertasApi = {
-  estadoMoto: (idMoto: number) => api.get(`/alertas/moto/${idMoto}`),
+  estadoMoto: (idMoto: number) => api.get(`/alertas/vehiculo/${idMoto}`),
   verificar:  (idMoto: number) => api.post(`/alertas/verificar/${idMoto}`, {}),
 };
 
 /* ── Mantenimientos realmente realizados (compartido entre usuarios) ── */
 export const mantenimientosApi = {
-  byMoto:   (idMoto: number) => api.get(`/mantenimientos/moto/${idMoto}`),
-  registrar:(data: { id_moto: number; tipo: string; km_servicio: number }) =>
-    api.post('/mantenimientos', { idMoto: data.id_moto, tipo: data.tipo, kmServicio: data.km_servicio }),
-  borrar:   (idMoto: number, tipo: string) => api.delete(`/mantenimientos/moto/${idMoto}/${tipo}`),
+  byMoto:   (idMoto: number) => api.get(`/mantenimientos/vehiculo/${idMoto}`),
+  registrar:(data: { id_vehiculo: number; tipo: string; km_servicio: number }) =>
+    api.post('/mantenimientos', { id_vehiculo: data.id_vehiculo, tipo: data.tipo, kmServicio: data.km_servicio }),
+  borrar:   (idMoto: number, tipo: string) => api.delete(`/mantenimientos/vehiculo/${idMoto}/${tipo}`),
 };
 
 /* ── Combustible (galones) — en la nube ── */
 export const combustibleApi = {
   list:   ()            => api.get('/combustible'),
-  byMoto: (idMoto: number) => api.get(`/combustible/moto/${idMoto}`),
+  byMoto: (idMoto: number) => api.get(`/combustible/vehiculo/${idMoto}`),
   create: (data: Record<string, unknown>) => api.post('/combustible', data),
   remove: (id: number)  => api.delete(`/combustible/${id}`),
   precios: () => api.get('/combustible/precios'),
@@ -326,7 +338,7 @@ export const ofertaApi = {
    Estrategia: ping → upload con timeout 90s → reintenta 2 veces si falla.
    ──────────────────────────────────────────────────────────────────────────── */
 export async function uploadWithRetry(
-  endpoint: '/motos/upload' | '/usuarios/upload' | '/productos/upload',
+  endpoint: '/vehiculos/upload' | '/usuarios/upload' | '/productos/upload',
   file: File,
   onProgress?: (msg: string) => void
 ): Promise<string> {

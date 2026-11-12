@@ -118,8 +118,8 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
   const [facDetalles, setFacDetalles] = useState<Record<number, DetalleFactura[]>>({});
   const [loadingFac, setLoadingFac]   = useState<number | null>(null);
 
-  const phone  = unlocked ? extractPhone(client.descripcion)  : null;
-  const cedula = unlocked ? extractCedula(client.descripcion) : null;
+  const phone  = unlocked ? (client.telefono ?? extractPhone(client.descripcion))  : null;
+  const cedula = unlocked ? (client.cedula ?? extractCedula(client.descripcion)) : null;
   const total  = regs.reduce((s,r)=>s+r.costo_total, 0);
   const done   = regs.filter(r=>r.estado>=2).length;
   const pending= regs.filter(r=>r.estado<2).length;
@@ -336,7 +336,7 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {motos.map(m => (
-                <div key={m.id_moto} className="gm-card-d rounded-2xl overflow-hidden">
+                <div key={m.id_vehiculo} className="gm-card-d rounded-2xl overflow-hidden">
                   <div className="h-[2px] bg-gradient-to-r from-blue-500/50 to-transparent" />
                   <div className="p-4 flex gap-4">
                     {imagenMoto(m) ? (
@@ -355,13 +355,13 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
                         </p>
                         <span className="plate-tag text-[10px] py-0">{m.placa}</span>
                       </div>
-                      {m.nombre_moto && (
-                        <p className="text-[11px] dark:text-white/35 text-slate-900/35 italic mb-1">"{m.nombre_moto}"</p>
+                      {m.nombre_vehiculo && (
+                        <p className="text-[11px] dark:text-white/35 text-slate-900/35 italic mb-1">"{m.nombre_vehiculo}"</p>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] dark:text-white/35 text-slate-900/35">
                         <span className="flex items-center gap-1"><Calendar size={9} />{m.anio}</span>
                         <span className="flex items-center gap-1"><Gauge size={9} />{m.kilometraje.toLocaleString('es-EC')} km</span>
-                        <span className="capitalize">{m.tipo_moto}</span>
+                        <span className="capitalize">{m.tipo_vehiculo}</span>
                       </div>
                     </div>
                   </div>
@@ -479,8 +479,8 @@ function ClienteCard({ client, regs, unlocked, onSelect, onUnlock }: {
   client: Usuario; regs: Reg[]; unlocked: boolean;
   onSelect: ()=>void; onUnlock: (e:React.MouseEvent)=>void;
 }) {
-  const phone  = unlocked ? extractPhone(client.descripcion)  : null;
-  const cedula = unlocked ? extractCedula(client.descripcion) : null;
+  const phone  = unlocked ? (client.telefono ?? extractPhone(client.descripcion))  : null;
+  const cedula = unlocked ? (client.cedula ?? extractCedula(client.descripcion)) : null;
   const total  = regs.reduce((s,r)=>s+r.costo_total, 0);
   const last   = regs[0] ?? null;
 
@@ -650,7 +650,7 @@ export default function ClientesPage() {
   const correosFiltrados = (() => {
     if (!tipoFiltro) return null;
     const duenosIds = new Set(
-      motos.filter(m => m.tipo_moto === tipoFiltro).map(m => m.id_usuario)
+      motos.filter(m => m.tipo_vehiculo === tipoFiltro).map(m => m.id_usuario)
     );
     return clientes
       .filter(c => duenosIds.has(c.id_usuario) && c.correo && !c.correo.endsWith('@gmotors.local'))
@@ -748,8 +748,8 @@ export default function ClientesPage() {
     const q = search.toLowerCase().trim();
     if (!q) return clientes;
     return clientes.filter(c => {
-      const cedula = extractCedula(c.descripcion) ?? '';
-      const phone  = extractPhone(c.descripcion) ?? '';
+      const cedula = c.cedula ?? extractCedula(c.descripcion) ?? '';
+      const phone  = c.telefono ?? extractPhone(c.descripcion) ?? '';
       const placas = motos.filter(m => m.id_usuario === c.id_usuario).map(m => m.placa.toLowerCase());
       return (
         c.nombre_completo.toLowerCase().includes(q) ||
@@ -1057,7 +1057,7 @@ export default function ClientesPage() {
               </button>
               {VEHICLE_TYPES.map(tipo => {
                 const active = tipoFiltro === tipo;
-                const count = motos.filter(m => m.tipo_moto === tipo).length;
+                const count = motos.filter(m => m.tipo_vehiculo === tipo).length;
                 return (
                   <button
                     key={tipo}

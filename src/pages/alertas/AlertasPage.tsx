@@ -227,7 +227,7 @@ export default function AlertasPage() {
 
           return (
             <div
-              key={a.moto.id_moto}
+              key={a.moto.id_vehiculo}
               className="gm-card-d rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-5"
               style={{ borderColor: a.urgency !== 'ok' ? cfg.border : undefined }}
             >

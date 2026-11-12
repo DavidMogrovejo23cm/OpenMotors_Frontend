@@ -205,7 +205,7 @@ export default function FacturaEditor({
       /* Auto-registro de mantenimiento al completar el trabajo.
          Lee inventario, repuestos manuales y la descripción original de la
          orden. La confirmación se espera para no cerrar con porcentajes viejos. */
-      const idMoto = registro.id_moto;
+      const idMoto = registro.id_vehiculo;
       const km = registro.kilometraje;
       const servicioQuedaCompletado = completarAlGuardar || registro.estado >= 2;
       if (servicioQuedaCompletado && idMoto && km != null) {
@@ -223,7 +223,7 @@ export default function FacturaEditor({
         ].filter(Boolean).join(' ');
         const tiposARegistrar = tiposMantenimientoEnTexto(textoServicio);
         await Promise.all(tiposARegistrar.map(tipo =>
-          mantenimientosApi.registrar({ id_moto: idMoto, tipo, km_servicio: km })
+          mantenimientosApi.registrar({ id_vehiculo: idMoto, tipo, km_servicio: km })
         ));
       }
 
@@ -383,7 +383,7 @@ export default function FacturaEditor({
         <div className="space-y-3">
           {/* Cabecera de la orden */}
           <div style={{ background: surface, border: `1px solid ${border}`, borderRadius: 10, padding: '10px 12px' }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: txt }}>{registro.marca_moto} {registro.modelo_moto}</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: txt }}>{registro.marca_vehiculo} {registro.modelo_vehiculo}</p>
             <p style={{ margin: '2px 0 0', fontSize: 11, color: muted }}>
               <span className="plate-tag">{registro.placa}</span> · {registro.tipo_servicio} · {registro.nombre_cliente}
             </p>
