@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   Open Motors — Ficha de Empleado / Mecánico
+   OpenMotors — Ficha de Empleado / Mecánico
    Tabs: Resumen financiero · Pagos · Permisos
    ───────────────────────────────────────────── */
 
@@ -8,17 +8,17 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import gsap from 'gsap';
 import {
   ChevronLeft, Wrench, DollarSign, ShieldCheck, Plus, Trash2,
-  TrendingUp, BarChart2, Calendar, FileText, CheckSquare, Square,
+  TrendingUp, BarChart2, Calendar, FileText, CheckSquare, Square, Briefcase,
 } from 'lucide-react';
-import { usuariosApi, pagosEmpleadoApi, type PagoEmpleadoAPI } from '../../lib/api';
+import { usuariosApi, pagosEmpleadoApi, personalApi, type PagoEmpleadoAPI, type PerfilLaboralAPI } from '../../lib/api';
 import { useToast } from '../../components/ui/Toast';
-import { fmtDate, fmtMoney, initials, getErrorMsg, parsePermisos, setPermisos } from '../../lib/utils';
+import { fmtDate, fmtMoney, initials, getErrorMsg } from '../../lib/utils';
 import { MODULOS, type ModuloKey, type PermisosEmpleado } from '../../lib/finanzasEmpleado';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import type { Usuario } from '../../types';
 
-type Tab = 'resumen' | 'pagos' | 'permisos';
+type Tab = 'resumen' | 'pagos' | 'permisos' | 'laboral';
 
 type ConceptoPago = 'Sueldo' | 'Bono' | 'Comisión' | 'Anticipo' | 'Otro';
 const CONCEPTOS: ConceptoPago[] = ['Sueldo', 'Bono', 'Comisión', 'Anticipo', 'Otro'];
@@ -327,10 +327,10 @@ function TabPermisos({
 
   /* Leer permisos actuales desde descripcion del backend */
   const getInitial = (): PermisosEmpleado => {
-    const lista = parsePermisos(empleado.descripcion);
+    const lista = empleado.permisos ?? [];
     const base  = {} as PermisosEmpleado;
     for (const { key } of MODULOS) {
-      base[key as ModuloKey] = lista ? lista.includes(key) : true;
+      base[key as ModuloKey] = lista.includes(key);
     }
     return base;
   };
@@ -342,11 +342,10 @@ function TabPermisos({
   const handleGuardar = async () => {
     setSaving(true);
     try {
-      const modulos    = MODULOS.filter(({ key }) => permisos[key as ModuloKey]).map(m => m.key);
-      const nuevaDesc  = setPermisos(empleado.descripcion, modulos);
-      await usuariosApi.update(empleado.id_usuario, { descripcion: nuevaDesc });
-      onUpdate(nuevaDesc);
-      toast.success('Permisos guardados — el mecánico debe cerrar sesión para que tomen efecto');
+      const autorizados = MODULOS.filter(({ key }) => permisos[key]).map(m => m.key);
+      await usuariosApi.guardarPermisos(empleado.id_usuario, autorizados);
+      onUpdate(empleado.descripcion ?? '');
+      toast.success('Autorizaciones guardadas');
       navigate('/perfiles');
     } catch (err) {
       toast.error(getErrorMsg(err));
@@ -359,7 +358,7 @@ function TabPermisos({
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-sm dark:text-white/40 text-slate-900/40">
-          Activa o desactiva el acceso a cada módulo del sistema para este empleado.
+          El mecánico puede atender sus órdenes asignadas. Activa aquí las tareas adicionales que podrá realizar.
         </p>
         <div className="flex gap-2 shrink-0">
           <button
@@ -419,14 +418,252 @@ function TabPermisos({
             : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
         }`}>
           {ningunoActivo
-            ? '⚠ Sin ningún permiso el mecánico no podrá acceder a ningún módulo.'
-            : '✓ Acceso completo a todos los módulos activado.'}
+            ? 'Sin autorizaciones adicionales: conserva el acceso a sus órdenes asignadas.'
+            : 'Las tres autorizaciones adicionales están activadas.'}
         </div>
       )}
 
       <div className="flex justify-end pt-2">
         <Button loading={saving} onClick={handleGuardar}>
           <ShieldCheck size={14} /> Guardar permisos
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Tab Ficha Laboral (RF-40) ─── */
+const MODALIDADES_PAGO: { value: PerfilLaboralAPI['modalidad_pago']; label: string }[] = [
+  { value: 'HORA',        label: 'Por hora'         },
+  { value: 'DIA',         label: 'Por día'          },
+  { value: 'SUELDO',      label: 'Sueldo fijo'      },
+  { value: 'POR_TRABAJO', label: 'Por trabajo'      },
+  { value: 'COMISION',    label: 'Por comisión (%)' },
+];
+
+const TIPOS_CONTRATO = [
+  { value: 'INDEFINIDO', label: 'Indefinido'         },
+  { value: 'PLAZO_FIJO', label: 'Plazo fijo'         },
+  { value: 'SERVICIOS',  label: 'Servicios / Free'   },
+  { value: 'POR_HORAS',  label: 'Por horas'          },
+];
+
+function TabLaboral({ idEmpleado }: { idEmpleado: number }) {
+  const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [actualizado, setActualizado] = useState<string | null>(null);
+  const [cargo, setCargo] = useState('Mecánico');
+  const [especialidad, setEspecialidad] = useState('');
+  const [fechaIngreso, setFechaIngreso] = useState('');
+  const [tipoContrato, setTipoContrato] = useState('INDEFINIDO');
+  const [modalidadPago, setModalidadPago] = useState<PerfilLaboralAPI['modalidad_pago']>('HORA');
+  const [tarifaHora, setTarifaHora] = useState('0');
+  const [salarioBase, setSalarioBase] = useState('0');
+  const [contactoEmergencia, setContactoEmergencia] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    personalApi.perfil(idEmpleado)
+      .then(({ data }) => {
+        if (!mounted) return;
+        const p = data.perfil_laboral;
+        if (p) {
+          setCargo(p.cargo || 'Mecánico');
+          setEspecialidad(p.especialidad || '');
+          setFechaIngreso(p.fecha_ingreso || '');
+          setTipoContrato(p.tipo_contrato || 'INDEFINIDO');
+          setModalidadPago(p.modalidad_pago || 'HORA');
+          setTarifaHora(String(p.tarifa_hora ?? 0));
+          setSalarioBase(String(p.salario_base ?? 0));
+          setContactoEmergencia(p.contacto_emergencia || '');
+          setObservaciones(p.observaciones || '');
+          setActualizado(p.actualizado_en || null);
+        }
+      })
+      .catch(err => toast.error(getErrorMsg(err)))
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [idEmpleado, toast]);
+
+  const guardar = async () => {
+    if (!cargo.trim()) {
+      toast.error('Ingresa el cargo del empleado');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await personalApi.guardarPerfil(idEmpleado, {
+        cargo: cargo.trim(),
+        especialidad: especialidad.trim() || null,
+        fecha_ingreso: fechaIngreso || null,
+        tipo_contrato: tipoContrato,
+        modalidad_pago: modalidadPago,
+        tarifa_hora: Number(tarifaHora) || 0,
+        salario_base: Number(salarioBase) || 0,
+        contacto_emergencia: contactoEmergencia.trim() || null,
+        observaciones: observaciones.trim() || null,
+      });
+      setActualizado(data.actualizado_en || null);
+      toast.success('Ficha laboral guardada');
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="gm-card-d rounded-2xl p-5 h-44 skeleton-d" />;
+  }
+
+  return (
+    <div className="gm-card-d rounded-2xl p-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold dark:text-white text-slate-900">
+            Ficha laboral y modalidad de pago
+          </h3>
+          <p className="text-xs dark:text-white/45 text-slate-500">
+            Define cargo, especialidad técnica, contrato y tarifas base del colaborador.
+          </p>
+        </div>
+        {actualizado && (
+          <span className="text-[11px] dark:text-white/40 text-slate-500">
+            Actualizado: {fmtDate(actualizado)}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Cargo *
+          </label>
+          <input
+            type="text"
+            value={cargo}
+            onChange={e => setCargo(e.target.value)}
+            className="input-dark w-full text-sm"
+            placeholder="Ej. Mecánico senior"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Especialidad
+          </label>
+          <input
+            type="text"
+            value={especialidad}
+            onChange={e => setEspecialidad(e.target.value)}
+            className="input-dark w-full text-sm"
+            placeholder="Ej. Motores / Electricidad / Frenos"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Fecha de ingreso
+          </label>
+          <input
+            type="date"
+            value={fechaIngreso}
+            onChange={e => setFechaIngreso(e.target.value)}
+            className="input-dark w-full text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Tipo de contrato
+          </label>
+          <select
+            value={tipoContrato}
+            onChange={e => setTipoContrato(e.target.value)}
+            className="input-dark w-full text-sm"
+          >
+            {TIPOS_CONTRATO.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Modalidad de pago
+          </label>
+          <select
+            value={modalidadPago}
+            onChange={e => setModalidadPago(e.target.value as PerfilLaboralAPI['modalidad_pago'])}
+            className="input-dark w-full text-sm"
+          >
+            {MODALIDADES_PAGO.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Tarifa por hora ($)
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={tarifaHora}
+            onChange={e => setTarifaHora(e.target.value)}
+            className="input-dark w-full text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Salario / Base mensual ($)
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={salarioBase}
+            onChange={e => setSalarioBase(e.target.value)}
+            className="input-dark w-full text-sm"
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+            Contacto de emergencia
+          </label>
+          <input
+            type="text"
+            value={contactoEmergencia}
+            onChange={e => setContactoEmergencia(e.target.value)}
+            className="input-dark w-full text-sm"
+            placeholder="Nombre y teléfono de contacto"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[11px] uppercase tracking-wider dark:text-white/50 text-slate-500 mb-1">
+          Observaciones laborales
+        </label>
+        <textarea
+          rows={3}
+          value={observaciones}
+          onChange={e => setObservaciones(e.target.value)}
+          className="input-dark w-full text-sm"
+          placeholder="Notas sobre certificaciones, horario especial o acuerdos..."
+        />
+      </div>
+
+      <div className="flex justify-end pt-1">
+        <Button onClick={guardar} loading={saving}>
+          Guardar ficha laboral
         </Button>
       </div>
     </div>
@@ -475,9 +712,10 @@ export default function EmpleadoDetailPage() {
   if (!empleado) return null;
 
   const TABS: { id: Tab; label: string; icon: typeof Wrench }[] = [
-    { id: 'resumen',  label: 'Resumen',  icon: BarChart2   },
-    { id: 'pagos',    label: 'Pagos',    icon: DollarSign  },
-    { id: 'permisos', label: 'Permisos', icon: ShieldCheck },
+    { id: 'resumen',  label: 'Resumen',       icon: BarChart2   },
+    { id: 'pagos',    label: 'Pagos',         icon: DollarSign  },
+    { id: 'permisos', label: 'Permisos',      icon: ShieldCheck },
+    { id: 'laboral',  label: 'Ficha laboral', icon: Briefcase   },
   ];
 
   return (
@@ -516,7 +754,7 @@ export default function EmpleadoDetailPage() {
       </div>
 
       {/* ─── Tabs ─── */}
-      <div className="section-enter tab-nav max-w-sm">
+      <div className="section-enter tab-nav max-w-lg">
         {TABS.map(({ id: tabId, label, icon: Icon }) => (
           <button
             key={tabId}
@@ -539,6 +777,7 @@ export default function EmpleadoDetailPage() {
             onUpdate={desc => setEmpleado(e => e ? { ...e, descripcion: desc } : e)}
           />
         )}
+        {tab === 'laboral'  && <TabLaboral  idEmpleado={idEmpleado} />}
       </div>
     </div>
   );

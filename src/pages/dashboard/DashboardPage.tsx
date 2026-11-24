@@ -1,6 +1,8 @@
+import { canAccessModulo } from '../../lib/utils';
+import { cobrosDeOrdenes, ORDEN_LABELS, ORDEN_COLORS } from '../../lib/utils';
 import type { LucideIcon } from 'lucide-react';
 /* ─────────────────────────────────────────────
-   GMotors — Dashboard Enterprise v3
+   OpenMotors — Dashboard Enterprise v3
    KPIs reales · Recharts · Multi-rol
    ───────────────────────────────────────────── */
 
@@ -14,11 +16,11 @@ import {
 import ContabilidadChart from '../../components/charts/ContabilidadChart';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
-import { motosApi, registrosApi, productosApi, usuariosApi, pagosEmpleadoApi, facturasApi, type PagoEmpleadoAPI } from '../../lib/api';
-import { fmtDate, fmtMoney, parsePermisos } from '../../lib/utils';
+import { carrosApi, registrosApi, productosApi, usuariosApi, pagosEmpleadoApi, facturasApi, type PagoEmpleadoAPI } from '../../lib/api';
+import { fmtDate, fmtMoney } from '../../lib/utils';
 import { usePolling } from '../../hooks/usePolling';
 import { useCountUp } from '../../hooks/useGsap';
-import type { Factura, RegistroDetalle, Moto, Producto } from '../../types';
+import type { Factura, RegistroDetalle, Carro, Producto } from '../../types';
 import { isNativeApp } from '../../lib/platform';
 import MobileDashboard from '../../components/mobile/MobileDashboard';
 import TermsModal from '../../components/ui/TermsModal';
@@ -156,10 +158,8 @@ function KpiCard({ icon: Icon, label, target, sub, to, color, trend }: {
 }
 
 /* ── Estado badge map ── */
-const ESTADO_COLORS: Record<number, string> = {
-  0: '#F59E0B', 1: '#3B82F6', 2: '#10B981', 3: '#8B5CF6', 4: '#14B8A6',
-};
-const ESTADO_LABELS = ['Pendiente', 'En proceso', 'Completado', 'Entregado', 'Facturado'];
+const ESTADO_COLORS = ORDEN_COLORS;
+const ESTADO_LABELS = ORDEN_LABELS;
 
 /* En el APK se usa el dashboard móvil premium; en web, el dashboard completo.
    Se separa en dos componentes para no llamar hooks tras un return condicional. */
@@ -194,7 +194,7 @@ function WebDashboard() {
   const isDark = theme === 'dark';
   const { user, isAdmin, isMecanico } = useAuth();
 
-  const [motos,       setMotos]       = useState<Moto[]>([]);
+  const [carros,       setCarros]       = useState<Carro[]>([]);
   const [registros,   setRegistros]   = useState<RegistroDetalle[]>([]);
   const [productos,   setProductos]   = useState<Producto[]>([]);
   const [usuarios,    setUsuarios]    = useState<unknown[]>([]);
@@ -209,22 +209,22 @@ function WebDashboard() {
 
   const load = useCallback(async () => {
     const promises = [
-      motosApi.list(), 
-      registrosApi.list(), 
-      productosApi.list(), 
+      carrosApi.list(),
+      registrosApi.list(),
+      (isAdmin || isMecanico) ? productosApi.list() : Promise.resolve({ data: [] }),
       isAdmin ? usuariosApi.list() : Promise.resolve({ data: [] }),
       isAdmin ? pagosEmpleadoApi.listAll() : Promise.resolve({ data: [] }),
       isAdmin ? facturasApi.list() : Promise.resolve({ data: [] })
     ];
     const [m, r, p, u, g, f] = await Promise.allSettled(promises);
-    
-    if (m.status === 'fulfilled') setMotos(m.value.data);
+
+    if (m.status === 'fulfilled') setCarros(m.value.data);
     if (r.status === 'fulfilled') setRegistros(r.value.data);
     if (p.status === 'fulfilled') setProductos(p.value.data);
     if (u.status === 'fulfilled') setUsuarios(u.value.data);
     if (g.status === 'fulfilled') setGastos(g.value.data);
     if (f.status === 'fulfilled') setFacturas(f.value.data);
-    
+
     setLoading(false);
   }, [isAdmin]);
 
@@ -235,8 +235,8 @@ function WebDashboard() {
 
   /* ── Métricas derivadas ── */
   const ingresosTotal = useMemo(() =>
-    facturas.reduce((s, f) => s + (f.costo_total ?? 0), 0)
-  , [facturas]);
+    cobrosDeOrdenes(registros).reduce((s, r) => s + r.costo_total, 0) + facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura)).reduce((s, f) => s + (f.costo_total ?? 0), 0)
+  , [registros, facturas]);
 
   const stockCritico = useMemo(() =>
     productos.filter(p => p.stock <= 3).length
@@ -269,7 +269,7 @@ function WebDashboard() {
       return {
         day: day.slice(5),
         ordenes: dayRegs.length,
-        ingresos: dayRegs.reduce((s, r) => s + (r.costo_total ?? 0), 0),
+        ingresos: cobrosDeOrdenes(registros).filter(r => toIsoDate(r.fecha).startsWith(day)).reduce((s, r) => s + r.costo_total, 0),
       };
     });
   }, [registros]);
@@ -282,12 +282,12 @@ function WebDashboard() {
       return d.toISOString().slice(0, 10);
     });
     return days.map(day => {
-      const dayRegs = registros.filter(r => toIsoDate(r.fecha).startsWith(day) && r.estado === 4); // Sólo ingresos facturados
+      const dayRegs = cobrosDeOrdenes(registros).filter(r => toIsoDate(r.fecha).startsWith(day)); // Sólo ingresos facturados
       const dayGastos = gastos.filter(g => toIsoDate(g.fecha).startsWith(day));
-      
+
       const ingresosDia = dayRegs.reduce((s, r) => s + (r.costo_total ?? 0), 0);
       const gastosDia   = dayGastos.reduce((s, g) => s + (g.monto ?? 0), 0);
-      
+
       return {
         name: day.slice(5),
         Ingresos: ingresosDia,
@@ -316,9 +316,9 @@ function WebDashboard() {
 
     const regsWeek      = registros.filter(r => enRango(r.fecha));
     const completadas   = regsWeek.filter(r => r.estado >= 2).length;
-    const facturadas    = regsWeek.filter(r => r.estado === 4);
+    const facturadas    = cobrosDeOrdenes(registros).filter(r => enRango(r.fecha));
     const ingresosWeek  = facturadas.reduce((s, r) => s + (r.costo_total ?? 0), 0);
-    const nuevasMotos   = motos.length;
+    const nuevasCarros   = carros.length;
     const ticketProm    = facturadas.length ? ingresosWeek / facturadas.length : 0;
 
     const tiposWeek: Record<string, number> = {};
@@ -336,7 +336,7 @@ function WebDashboard() {
         <p style="margin:6px 0 0;font-size:26px;font-weight:900;color:${color};letter-spacing:-1px">${val}</p>
       </div>`;
     w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-      <title>GMotors — Reporte semanal ${rango}</title>
+      <title>OpenMotors — Reporte semanal ${rango}</title>
       <style>
         *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
         body{font-family:'Segoe UI',Arial,sans-serif;color:#0F172A;background:#fff;padding:32px}
@@ -367,7 +367,7 @@ function WebDashboard() {
         ${kpi('Facturadas', String(facturadas.length), '#14B8A6')}
         ${kpi('Ingresos', fmtMoney(ingresosWeek), '#E11428')}
         ${kpi('Ticket prom.', fmtMoney(ticketProm), '#8B5CF6')}
-        ${kpi('Vehículos totales', String(nuevasMotos), '#3B82F6')}
+        ${kpi('Vehículos totales', String(nuevasCarros), '#3B82F6')}
       </div>
 
       <h3>Servicios de la semana (${regsWeek.length})</h3>
@@ -395,7 +395,7 @@ function WebDashboard() {
         </div>
       </div>
 
-      <div class="foot">Generado el ${hoy.toLocaleString('es-EC')} · Open Motors · Sistema de gestión</div>
+      <div class="foot">Generado el ${hoy.toLocaleString('es-EC')} · OpenMotors · Sistema de gestión</div>
     </body></html>`);
     w.document.close(); w.focus();
     setTimeout(() => w.print(), 400);
@@ -403,8 +403,8 @@ function WebDashboard() {
 
   /* ── Vista cliente — cualquier usuario que NO sea admin ni mecánico ── */
   if (!isAdmin && !isMecanico) {
-    const myMotos   = motos.filter(m => m.id_usuario === user?.id_usuario);
-    const myPlacas  = new Set(myMotos.map(m => m.placa));
+    const myCarros   = carros.filter(m => m.id_usuario === user?.id_usuario);
+    const myPlacas  = new Set(myCarros.map(m => m.placa));
     const myRegs    = registros.filter(r => myPlacas.has(r.placa));
     const myPuntos  = myRegs.length * 8;
     return (
@@ -413,7 +413,7 @@ function WebDashboard() {
           <p className="text-[11px] dark:text-white/30 text-slate-900/30 font-bold uppercase tracking-widest">{greeting}</p>
           <h1 className="text-3xl font-black dark:text-white text-slate-900 mt-1">{firstName}</h1>
           <div className="flex items-center gap-4 mt-4 flex-wrap">
-            <div className="text-center"><p className="text-2xl font-black dark:text-white text-slate-900">{myMotos.length}</p><p className="text-xs dark:text-white/35 text-slate-900/35">Vehículos</p></div>
+            <div className="text-center"><p className="text-2xl font-black dark:text-white text-slate-900">{myCarros.length}</p><p className="text-xs dark:text-white/35 text-slate-900/35">Vehículos</p></div>
             <div className="w-px h-8 bg-white/10" />
             <div className="text-center"><p className="text-2xl font-black dark:text-white text-slate-900">{myRegs.length}</p><p className="text-xs dark:text-white/35 text-slate-900/35">Servicios</p></div>
             <div className="w-px h-8 bg-white/10" />
@@ -422,7 +422,7 @@ function WebDashboard() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
-            { label: 'Mis vehículos',    to: '/mi-moto',     color: '#3B82F6', icon: Car   },
+            { label: 'Mis vehículos',    to: '/mi-carro',     color: '#3B82F6', icon: Car   },
             { label: 'Mi portal',    to: '/portal',      color: '#10B981', icon: Users  },
           ].map(({ label, to, color, icon: Icon }) => (
             <Link key={to} to={to}
@@ -497,7 +497,7 @@ function WebDashboard() {
 
       {/* ── KPI Cards ── */}
       <div className="dashboard-metrics">
-        <KpiCard icon={Car}    label="Vehículos registrados" target={motos.length}    sub="vehículos totales"   to="/motos"      color="#3B82F6" />
+        <KpiCard icon={Car}    label="Vehículos registrados" target={carros.length}    sub="vehículos totales"   to="/carros"      color="#3B82F6" />
         <KpiCard icon={Wrench}  label="Órdenes activas"   target={activas}         sub="en proceso/pendiente" to="/registros"  color="#E11428" />
         <KpiCard icon={Package} label="Stock crítico"      target={stockCritico}   sub="productos ≤3 unidades" to="/inventario" color="#F59E0B" />
         {isAdmin && <KpiCard icon={Users} label="Usuarios" target={usuarios.length} sub="cuentas del sistema" to="/perfiles"   color="#8B5CF6" />}
@@ -505,7 +505,7 @@ function WebDashboard() {
 
       {/* ── Panel general de módulos (SOLO admin/mecánico · sin Contabilidad) ── */}
       {(isAdmin || isMecanico) && !loading && (() => {
-        const facturados = registros.filter(r => r.estado === 4).length;
+        const facturados = cobrosDeOrdenes(registros).length;
         const pct = (n: number, total: number) => total > 0 ? Math.round((n / total) * 100) : 0;
 
         const MODS: {
@@ -515,8 +515,8 @@ function WebDashboard() {
           { to:'/registros',   label:'Registros',   icon:Wrench,      color:'#E11428',
             val: registros.length,  sub:`${activas} activos · ${facturados} facturados`,
             pct: pct(facturados, registros.length) },
-          { to:'/motos',       label:'Vehículos',        icon:Car,        color:'#3B82F6',
-            val: motos.length,      sub:`vehículos registrados`, pct: 100 },
+          { to:'/carros',       label:'Vehículos',        icon:Car,        color:'#3B82F6',
+            val: carros.length,      sub:`vehículos registrados`, pct: 100 },
           { to:'/inventario',  label:'Inventario',   icon:Package,     color:'#F59E0B',
             val: productos.length,  sub:`${stockCritico} con stock crítico`,
             pct: productos.length > 0 ? Math.round(((productos.length - stockCritico) / productos.length) * 100) : 100 },
@@ -529,11 +529,7 @@ function WebDashboard() {
         ];
 
         /* Respetar los permisos del mecánico: solo módulos a los que el admin le dio acceso */
-        const mecPermisos = isMecanico ? parsePermisos(user?.descripcion) : null;
-        const puedeMod = (to: string) => {
-          if (isAdmin || !isMecanico || !mecPermisos) return true;
-          return mecPermisos.includes(to.replace('/', ''));
-        };
+        const puedeMod = (to: string) => canAccessModulo(user?.permisos, to.replace('/', ''), isAdmin, isMecanico);
         const MODS_VISIBLES = MODS.filter(m => puedeMod(m.to));
 
         return (
@@ -684,7 +680,7 @@ function WebDashboard() {
                  style={{ background: 'linear-gradient(135deg, #17171E, rgba(16,185,129,0.06))' }}>
               <p className="text-[10px] tracking-[0.28em] uppercase dark:text-white/28 text-slate-900/28 font-bold mb-2">Ingresos facturados</p>
               <p className="kpi-mega text-3xl">{fmtMoney(ingresosTotal)}</p>
-              <p className="text-xs dark:text-white/30 text-slate-900/30 mt-1">Total acumulado · {registros.filter(r=>r.estado===4).length} facturas</p>
+              <p className="text-xs dark:text-white/30 text-slate-900/30 mt-1">Total acumulado · {cobrosDeOrdenes(registros).length} cobros</p>
             </div>
           )}
 
@@ -714,7 +710,7 @@ function WebDashboard() {
             <div className="space-y-1.5">
               {[
                 { label: 'Nueva orden',    icon: Wrench,  to: '/registros',   desc: 'Crear servicio'   },
-                { label: 'Registrar vehículo', icon: Car,    to: '/motos',       desc: 'Nuevo vehículo'   },
+                { label: 'Registrar vehículo', icon: Car,    to: '/carros',       desc: 'Nuevo vehículo'   },
                 ...(isAdmin ? [
                   { label: 'Pagos',         icon: Activity, to: '/pagos',     desc: 'Cobros y facturas' },
                   { label: 'Perfiles',      icon: Users,    to: '/perfiles',  desc: 'Equipo' },

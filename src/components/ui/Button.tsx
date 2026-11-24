@@ -14,16 +14,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary:   'bg-[var(--om-action)] !text-white hover:bg-[var(--om-hover)]',
-  secondary: 'border border-[var(--om-action)] bg-white text-[var(--om-action)] hover:bg-[var(--om-alert)] hover:text-[var(--om-hover)]',
-  ghost:     'text-slate-900/45 hover:text-slate-900/80 hover:bg-slate-900/[0.04] dark:text-white/40 dark:hover:text-white/75 dark:hover:bg-white/[0.04] active:scale-[0.98]',
-  danger:    'bg-gm-danger/90 text-white border border-gm-danger/20 hover:bg-gm-danger hover:shadow-lg hover:shadow-gm-danger/30 active:scale-[0.98]',
+  primary:   'bg-[var(--om-action)] !text-white hover:bg-[var(--om-hover)] shadow-xs active:scale-[0.98]',
+  secondary: 'border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white shadow-xs active:scale-[0.98]',
+  ghost:     'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/5 active:scale-[0.98]',
+  danger:    'bg-red-600 text-white hover:bg-red-700 shadow-xs active:scale-[0.98]',
 };
 
 const sizes: Record<Size, string> = {
   sm: 'h-8  px-3 text-xs  gap-1.5',
-  md: 'h-10 px-4 text-sm  gap-2',
-  lg: 'h-12 px-6 text-base gap-2.5',
+  md: 'h-9  px-4 text-[13px] gap-2',
+  lg: 'h-11 px-5 text-sm gap-2.5',
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -33,8 +33,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          'inline-flex items-center justify-center font-medium rounded-full',
-          'transition-all duration-200 select-none',
+          'inline-flex items-center justify-center font-medium rounded-xl',
+          'transition-all duration-150 select-none cursor-pointer',
           'disabled:opacity-50 disabled:cursor-not-allowed',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--om-link)] focus-visible:ring-offset-2',
           variants[variant],

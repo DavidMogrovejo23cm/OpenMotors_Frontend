@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Estado de mantenimiento (visual)
+   OpenMotors — Estado de mantenimiento (visual)
    El desgaste se mide desde el ÚLTIMO MANTENIMIENTO REAL.
    El mecánico/admin marca cada pieza como cambiada → se resetea.
    Las piezas no cambiadas siguen acumulando desgaste (rojo).
@@ -15,7 +15,7 @@ import {
   calcularEstadoLocal,
   ESTADO_COLOR,
 } from '../../lib/mantenimiento';
-import type { Moto } from '../../types';
+import type { Carro } from '../../types';
 
 interface MantenimientoApi { tipo: string; kmServicio: number }
 
@@ -36,8 +36,8 @@ function BarraDesgaste({ pct, color, isDark = true }: { pct: number; color: stri
   );
 }
 
-/* ════════ Estado de mantenimiento de UNA moto ════════ */
-export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?: boolean }) {
+/* ════════ Estado de mantenimiento de UN carro ════════ */
+export function EstadoCarroLive({ carro, compact = false }: { carro: Carro; compact?: boolean }) {
   const { isAdmin, isMecanico } = useAuth();
   const [theme] = useTheme();
   const isDark = theme === 'dark';
@@ -47,7 +47,7 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
 
   /* Carga compartida desde el backend (100% nube, sin almacenamiento local) */
   const cargarServicios = () => {
-    mantenimientosApi.byMoto(moto.id_vehiculo)
+    mantenimientosApi.byCarro(carro.id_vehiculo)
       .then(({ data }) => {
         const map: Record<string, number> = {};
         (data as MantenimientoApi[]).forEach(m => {
@@ -57,28 +57,28 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
         setErrorServ(false);
       })
       .catch((err) => {
-        /* 404 = la moto no tiene registros de mantenimiento aún → array vacío, sin error */
+        /* 404 = el carro no tiene registros de mantenimiento aún → array vacío, sin error */
         const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 404) { setServicios({}); setErrorServ(false); }
         else setErrorServ(true);
       });
   };
-  useEffect(cargarServicios, [moto.id_vehiculo]);
+  useEffect(cargarServicios, [carro.id_vehiculo]);
 
   const estado = useMemo(
-    () => calcularEstadoLocal(moto.cilindraje, moto.kilometraje, servicios),
-    [moto.cilindraje, moto.kilometraje, servicios],
+    () => calcularEstadoLocal(carro.cilindraje, carro.kilometraje, servicios),
+    [carro.cilindraje, carro.kilometraje, servicios],
   );
 
   const marcarCambiado = (tipo: string) => {
-    setServicios(s => ({ ...s, [tipo]: moto.kilometraje }));   // optimista
-    mantenimientosApi.registrar({ id_vehiculo: moto.id_vehiculo, tipo, km_servicio: moto.kilometraje })
+    setServicios(s => ({ ...s, [tipo]: carro.kilometraje }));   // optimista
+    mantenimientosApi.registrar({ id_vehiculo: carro.id_vehiculo, tipo, km_servicio: carro.kilometraje })
       .then(cargarServicios)
       .catch(() => { setErrorServ(true); cargarServicios(); }); // revierte si falla
   };
   const deshacer = (tipo: string) => {
     setServicios(s => { const n = { ...s }; delete n[tipo]; return n; });
-    mantenimientosApi.borrar(moto.id_vehiculo, tipo)
+    mantenimientosApi.borrar(carro.id_vehiculo, tipo)
       .then(cargarServicios)
       .catch(() => { setErrorServ(true); cargarServicios(); });
   };
@@ -93,9 +93,9 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
       .filter(e => e.estado === 'VENCIDO' || e.estado === 'PROXIMO')
       .map(e => `• ${e.label}${e.estado === 'VENCIDO' ? ' (urgente)' : ''}`);
     return (
-      `¡Hola ${WORKSHOP_CONTACT.nombre}! 🏍️\n\n` +
-      `Quiero agendar una cita para mi vehículo ${moto.marca} ${moto.modelo} (placa ${moto.placa}).\n` +
-      `Kilometraje actual: ${moto.kilometraje.toLocaleString('es-EC')} km.` +
+      `¡Hola ${WORKSHOP_CONTACT.nombre}! 🚗\n\n` +
+      `Quiero agendar una cita para mi vehículo ${carro.marca} ${carro.modelo} (placa ${carro.placa}).\n` +
+      `Kilometraje actual: ${carro.kilometraje.toLocaleString('es-EC')} km.` +
       (pendientes.length ? `\n\nMantenimiento que necesita:\n${pendientes.join('\n')}` : '') +
       `\n\n¿Qué horarios tienen disponibles? Gracias.`
     );
@@ -214,7 +214,7 @@ export function EstadoMotoLive({ moto, compact = false }: { moto: Moto; compact?
       {/* Nota para el mecánico */}
       {canService && (
         <p style={{ fontSize: 10.5, color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.5)', margin: '10px 0 0', lineHeight: 1.5 }}>
-          Al revisar el vehículo, marca lo que realmente cambiaste a estos {moto.kilometraje.toLocaleString('es-EC')} km.
+          Al revisar el vehículo, marca lo que realmente cambiaste a estos {carro.kilometraje.toLocaleString('es-EC')} km.
           Esa pieza se reinicia a 0%; las demás siguen acumulando hasta su próximo cambio.
         </p>
       )}

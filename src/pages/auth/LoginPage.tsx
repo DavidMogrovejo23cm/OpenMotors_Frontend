@@ -8,6 +8,7 @@ import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { getErrorMsg } from '../../lib/utils';
+import { EXPIRED_REASON_KEY } from '../../lib/inactivity';
 import Input from '../../components/ui/Input';
 import { healthApi } from '../../lib/api';
 
@@ -42,10 +43,15 @@ export default function LoginPage() {
     if (user && token) navigate('/dashboard', { replace: true });
   }, [user, token, navigate]);
 
-  /* Verificación email */
+  /* Verificación email y aviso de expiración por inactividad */
   useEffect(() => {
     if (params.get('verified') === '1')
       toast.success('¡Correo verificado! Ahora puedes iniciar sesión.', 'Email confirmado');
+    const expiredFlag = params.get('expired') === '1' || sessionStorage.getItem(EXPIRED_REASON_KEY) === 'inactivity';
+    if (expiredFlag) {
+      sessionStorage.removeItem(EXPIRED_REASON_KEY);
+      toast.warning('Tu sesión expiró por inactividad. Por seguridad, vuelve a iniciar sesión.', 'Sesión caducada');
+    }
   }, []);
 
   /* Wake-up ping — despierta el backend Render al cargar la página de login.
@@ -99,14 +105,14 @@ export default function LoginPage() {
       <header className="login-header">
         <Link to="/login" className="login-brand">
           <img src="/brand/open-motor-logo.png" width="32" height="32" alt="" />
-          Open Motors
+          OpenMotors
         </Link>
-        <Link to="/registro" className="login-outline">Solicitar cuenta</Link>
+        <Link to="/registro" className="login-outline">Crear cuenta</Link>
       </header>
       <section className="login-content" aria-labelledby="login-title">
         <div className="login-form">
           <h1 id="login-title">Iniciar<br /> sesión</h1>
-          <p>Accede a tu cuenta de Open Motors.</p>
+          <p>Accede a tu cuenta de OpenMotors.</p>
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <Input label="Correo o usuario" type="text" autoComplete="username" autoCapitalize="none"
               placeholder="tu@correo.com" prefix={<Mail size={16} />}

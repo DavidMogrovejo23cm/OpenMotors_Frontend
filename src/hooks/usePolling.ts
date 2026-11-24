@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Hook de refresco en tiempo real
+   OpenMotors — Hook de refresco en tiempo real
    Vuelve a cargar datos automáticamente:
      · al montar
      · cada `intervalMs` (por defecto 20 s), solo si la pestaña está visible

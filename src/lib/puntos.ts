@@ -1,4 +1,4 @@
-import type { CargaCombustible, DetalleFactura, Moto, RegistroDetalle, Usuario } from '../types';
+import type { CargaCombustible, DetalleFactura, Carro, RegistroDetalle, Usuario } from '../types';
 import { parseDescuentoPuntos } from './detalles';
 
 export const POINTS_TABLE = [
@@ -43,21 +43,21 @@ export function puntosCanjeadosEnRegistros(registros: RegistroDetalle[]): number
 
 export function puntosCliente(params: {
   usuario: Usuario;
-  motos: Moto[];
+  carros: Carro[];
   registros: RegistroDetalle[];
   combustible?: CargaCombustible[];
 }) {
-  const { usuario, motos, registros, combustible = [] } = params;
-  const placas = new Set(motos.map(m => m.placa));
-  const motoMap = new Map(motos.map(m => [m.placa, m]));
+  const { usuario, carros, registros, combustible = [] } = params;
+  const placas = new Set(carros.map(m => m.placa));
+  const carroMap = new Map(carros.map(m => [m.placa, m]));
 
   const registrosCliente = registros.filter(r =>
     (r.id_cliente != null && r.id_cliente === usuario.id_usuario) || placas.has(r.placa)
   );
 
   const puntosServicio = registrosCliente.reduce((total, r) => {
-    const moto = motoMap.get(r.placa);
-    const cc = moto?.cilindraje ?? 125;
+    const carro = carroMap.get(r.placa);
+    const cc = carro?.cilindraje ?? 125;
     return total + ptsForCc(cc) + (isOilChange(r.tipo_servicio, r.descripcion) ? 3 : 0);
   }, 0);
 

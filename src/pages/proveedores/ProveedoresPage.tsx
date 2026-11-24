@@ -1,10 +1,12 @@
 /* ─────────────────────────────────────────────
-   GMotors — Módulo de Proveedores
+   OpenMotors — Módulo de Proveedores
    Agrupa productos por proveedor · alertas stock bajo
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Truck, Package, AlertTriangle, Phone, Mail, CheckCircle2, X, Edit2, Save, MessageCircle, Plus, Search, Info, Trash2 } from 'lucide-react';
+import Modal from '../../components/ui/Modal';
+import Button from '../../components/ui/Button';
 import { productosApi, proveedorContactosApi } from '../../lib/api';
 import { fmtMoney, getErrorMsg } from '../../lib/utils';
 import { useToast } from '../../components/ui/Toast';
@@ -152,7 +154,7 @@ function ProveedorCard({ codigo, productos, contacto, onEdit, onView }: Proveedo
                 );
               }
               const items = productos.filter(p => p.stock <= 5).map(p => `• ${p.nombre} (${p.stock} u.)`).join('\n');
-              const msg = encodeURIComponent(`Hola! Soy Open Motors\n\nNecesitamos reponer:\n${items}\n\nGracias.`);
+              const msg = encodeURIComponent(`Hola! Soy OpenMotors\n\nNecesitamos reponer:\n${items}\n\nGracias.`);
               return (
                 <a
                   href={`https://wa.me/${intl}?text=${msg}`}
@@ -206,8 +208,6 @@ function ContactoModal({ codigo, contacto, isNew = false, onSave, onClose, onDel
   onClose:   () => void;
   onDelete?: () => void;
 }) {
-  const [theme] = useTheme();
-  const isDark = theme === 'dark';
   const [codigoState, setCodigoState] = useState(codigo);
   const [nombre,   setNombre]   = useState(contacto?.nombre   ?? '');
   const [telefono, setTelefono] = useState(contacto?.telefono ?? '');
@@ -224,23 +224,46 @@ function ContactoModal({ codigo, contacto, isNew = false, onSave, onClose, onDel
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-         style={{ background: isDark ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)' }}>
-      <div className="w-full max-w-md rounded-2xl p-6 space-y-4"
-           style={{ background: isDark ? '#131318' : '#FFFFFF', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#E4E7EC'}` }}>
-        <div className="flex items-center justify-between">
+    <Modal
+      open={true}
+      onClose={onClose}
+      title={isNew ? 'Nuevo proveedor' : 'Datos de contacto'}
+      description={!isNew ? `Proveedor: ${codigo}` : undefined}
+      size="md"
+      footer={
+        <div className="flex items-center justify-between w-full">
           <div>
-            <h3 className="text-base font-black dark:text-white text-slate-900">{isNew ? 'Nuevo proveedor' : 'Datos de contacto'}</h3>
-            {!isNew && <p className="text-[11px] dark:text-white/35 text-slate-900/35 mt-0.5 font-mono">Proveedor: {codigo}</p>}
+            {!isNew && onDelete && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={onDelete}
+              >
+                <Trash2 size={13} className="mr-1.5" /> Eliminar
+              </Button>
+            )}
           </div>
-          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={onClose}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={save}
+              disabled={isNew ? !codigoState.trim() || !nombre.trim() : !nombre.trim()}
+            >
+              <Save size={13} className="mr-1.5" /> Guardar
+            </Button>
+          </div>
         </div>
-
+      }
+    >
+      <div className="space-y-3.5">
         {isNew && (
           <div>
-            <label className="text-[10px] font-black dark:text-white/35 text-slate-900/35 uppercase tracking-widest block mb-1">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
               RUC / código proveedor *
             </label>
             <input
@@ -250,59 +273,32 @@ function ContactoModal({ codigo, contacto, isNew = false, onSave, onClose, onDel
               onChange={e => setCodigoState(e.target.value)}
               autoFocus
             />
-            <p className="text-[10px] dark:text-white/25 text-slate-900/25 mt-1">
-              Úsalo como "RUC/código proveedor" al crear productos para agruparlos aquí.
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+              Úsalo como &quot;RUC/código proveedor&quot; al crear productos para agruparlos aquí.
             </p>
           </div>
         )}
 
-        <div className="space-y-3">
-          {[
-            { label: 'Nombre / Empresa', value: nombre,   set: setNombre,   ph: 'Distribuidora XYZ' },
-            { label: 'Teléfono',         value: telefono, set: setTelefono, ph: '+593 99 123 4567' },
-            { label: 'Email',            value: email,    set: setEmail,    ph: 'ventas@proveedor.com' },
-            { label: 'Producto principal',value: producto, set: setProducto, ph: 'Aceite 20W-50, filtros...' },
-          ].map(({ label, value, set, ph }) => (
-            <div key={label}>
-              <label className="text-[10px] font-black dark:text-white/35 text-slate-900/35 uppercase tracking-widest block mb-1">
-                {label}
-              </label>
-              <input
-                className="gm-input-d w-full"
-                placeholder={ph}
-                value={value}
-                onChange={e => set(e.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          {!isNew && onDelete && (
-            <button
-              onClick={onDelete}
-              className="px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5"
-              style={{ background: 'rgba(225,20,40,0.1)', border: '1px solid rgba(225,20,40,0.25)', color: '#E11428' }}
-            >
-              <Trash2 size={13} /> Eliminar
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold dark:text-white/40 text-slate-900/40 hover:dark:text-white/70 text-slate-900/70 border border-white/[0.07] transition-all"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={save}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-black transition-all"
-            style={{ background: '#E11428', color: '#fff' }}
-          >
-            <Save size={13} /> Guardar
-          </button>
-        </div>
+        {[
+          { label: 'Nombre / Empresa *',  value: nombre,   set: setNombre,   ph: 'Distribuidora XYZ' },
+          { label: 'Teléfono',          value: telefono, set: setTelefono, ph: '+593 99 123 4567' },
+          { label: 'Email',             value: email,    set: setEmail,    ph: 'ventas@proveedor.com' },
+          { label: 'Producto principal', value: producto, set: setProducto, ph: 'Aceite 20W-50, filtros...' },
+        ].map(({ label, value, set, ph }) => (
+          <div key={label}>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+              {label}
+            </label>
+            <input
+              className="gm-input-d w-full"
+              placeholder={ph}
+              value={value}
+              onChange={e => set(e.target.value)}
+            />
+          </div>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -595,98 +591,89 @@ export default function ProveedoresPage() {
 
       {/* ─── Modal de productos del proveedor ─── */}
       {viewCodigo !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}>
-          <div className="gm-provider-products-modal w-full max-w-4xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden"
-               style={{ background: '#131318', border: '1px solid rgba(255,255,255,0.1)' }}>
-            
-            {/* Header del modal */}
-            <div className="px-6 py-4 flex items-center justify-between border-b border-white/[0.05]">
-              <div>
-                <h2 className="text-lg font-black text-[#F4F4F5] flex items-center gap-2">
-                  <Package size={20} className="text-gm-red" />
-                  Productos de {contactos[viewCodigo]?.nombre || viewCodigo}
-                </h2>
-                <p className="text-[12px] text-white/45 mt-1 font-mono">
-                  {productos.filter(p => p.codigo_proveedor === viewCodigo).length} productos asociados
-                </p>
-              </div>
-              <button onClick={() => setViewCodigo(null)} className="text-white/55 hover:text-white transition-colors">
-                <X size={20} />
-              </button>
+        <Modal
+          open={viewCodigo !== null}
+          onClose={() => setViewCodigo(null)}
+          title={`Productos de ${contactos[viewCodigo]?.nombre || viewCodigo}`}
+          description={`${productos.filter(p => p.codigo_proveedor === viewCodigo).length} productos asociados`}
+          size="3xl"
+        >
+          <div className="space-y-4">
+            <div className="search-d">
+              <Search size={14} />
+              <input
+                className="gm-input-d w-full"
+                placeholder="Buscar producto, código interno o distribuidor..."
+                value={productSearch}
+                onChange={e => setProductSearch(e.target.value)}
+              />
             </div>
-
-            {/* Contenido scrolleable */}
-            <div className="p-6 overflow-y-auto flex-1 dark-scroll bg-[#0D0D12]">
-              <div className="search-d mb-4">
-                <Search size={14} />
-                <input
-                  className="gm-input-d"
-                  placeholder="Buscar producto, codigo interno o codigo distribuidor..."
-                  value={productSearch}
-                  onChange={e => setProductSearch(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {productos.filter(p => {
-                  if (p.codigo_proveedor !== viewCodigo) return false;
-                  const q = productSearch.toLowerCase().trim();
-                  if (!q) return true;
-                  return (
-                    p.nombre.toLowerCase().includes(q) ||
-                    (p.descripcion ?? '').toLowerCase().includes(q) ||
-                    (p.codigo_personal ?? '').toLowerCase().includes(q) ||
-                    (p.codigo_distribuidor ?? '').toLowerCase().includes(q)
-                  );
-                }).map(p => {
-                  const lvl = stockLevel(p.stock);
-                  const st  = LEVEL_STYLE[lvl];
-                  return (
-                    <div key={p.id_producto} className="rounded-xl overflow-hidden" style={{ background: '#17171E', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div className="p-4 border-b border-white/[0.08]">
-                        <h3 className="text-sm font-bold text-[#F4F4F5] truncate mb-1">{p.nombre}</h3>
-                        <div className="flex gap-2 text-[10px] text-white/45 font-mono">
-                          <span>{p.codigo_personal || 'SIN CÓD.'}</span>
-                          {p.codigo_distribuidor && <span>Dist: {p.codigo_distribuidor}</span>}
-                        </div>
-                      </div>
-                      <div className="p-4 grid grid-cols-3 gap-2">
-                        <div>
-                          <p className="text-[10px] text-white/50 mb-0.5 uppercase">Costo</p>
-                          <p className="text-[12px] font-bold text-white/85">{fmtMoney(p.costo)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-white/50 mb-0.5 uppercase">PVP</p>
-                          <p className="text-[12px] font-bold text-[#F4F4F5]">{fmtMoney(p.pvp)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] mb-0.5 uppercase" style={{ color: `${st.color}80` }}>{st.label}</p>
-                          <p className="text-[13px] font-black" style={{ color: st.color }}>{p.stock} u.</p>
-                        </div>
-                      </div>
-                      <div className="px-4 pb-4 flex gap-2">
-                        <button
-                          className="flex-1 py-2 rounded-lg text-[11px] font-bold"
-                          style={{ background: 'rgba(59,130,246,0.12)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.25)' }}
-                          onClick={() => window.alert(`${p.nombre}\n\nCodigo interno: ${p.codigo_personal || '-'}\nCodigo distribuidor: ${p.codigo_distribuidor || '-'}\nProveedor: ${p.codigo_proveedor || '-'}\nStock: ${p.stock} u.\nCosto: ${fmtMoney(p.costo)}\nPVP: ${fmtMoney(p.pvp)}\n\n${p.descripcion || ''}`)}
-                        >
-                          Ver detalle
-                        </button>
-                        <button
-                          className="flex-1 py-2 rounded-lg text-[11px] font-bold"
-                          style={{ background: 'rgba(225,20,40,0.12)', color: '#FF6470', border: '1px solid rgba(225,20,40,0.25)' }}
-                          onClick={() => { window.location.href = '/inventario'; }}
-                        >
-                          Editar
-                        </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {productos.filter(p => {
+                if (p.codigo_proveedor !== viewCodigo) return false;
+                const q = productSearch.toLowerCase().trim();
+                if (!q) return true;
+                return (
+                  p.nombre.toLowerCase().includes(q) ||
+                  (p.descripcion ?? '').toLowerCase().includes(q) ||
+                  (p.codigo_personal ?? '').toLowerCase().includes(q) ||
+                  (p.codigo_distribuidor ?? '').toLowerCase().includes(q)
+                );
+              }).map(p => {
+                const lvl = stockLevel(p.stock);
+                const st  = LEVEL_STYLE[lvl];
+                return (
+                  <div
+                    key={p.id_producto}
+                    className="rounded-xl overflow-hidden bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/[0.06] flex flex-col justify-between"
+                  >
+                    <div className="p-3.5 border-b border-slate-200/60 dark:border-white/[0.06]">
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate mb-1">
+                        {p.nombre}
+                      </h4>
+                      <div className="flex gap-2 text-[10px] text-slate-400 dark:text-slate-400 font-mono">
+                        <span>{p.codigo_personal || 'SIN CÓD.'}</span>
+                        {p.codigo_distribuidor && <span>· Dist: {p.codigo_distribuidor}</span>}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="p-3.5 grid grid-cols-3 gap-2 text-center sm:text-left">
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Costo</p>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{fmtMoney(p.costo)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">PVP</p>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100">{fmtMoney(p.pvp)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase font-medium" style={{ color: st.color }}>{st.label}</p>
+                        <p className="text-xs font-black" style={{ color: st.color }}>{p.stock} u.</p>
+                      </div>
+                    </div>
+                    <div className="px-3.5 pb-3.5 flex gap-2 pt-1">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1 text-[11px] h-7"
+                        onClick={() => window.alert(`${p.nombre}\n\nCódigo interno: ${p.codigo_personal || '-'}\nCódigo distribuidor: ${p.codigo_distribuidor || '-'}\nProveedor: ${p.codigo_proveedor || '-'}\nStock: ${p.stock} u.\nCosto: ${fmtMoney(p.costo)}\nPVP: ${fmtMoney(p.pvp)}\n\n${p.descripcion || ''}`)}
+                      >
+                        Detalle
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1 text-[11px] h-7"
+                        onClick={() => { window.location.href = '/inventario'; }}
+                      >
+                        Editar
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

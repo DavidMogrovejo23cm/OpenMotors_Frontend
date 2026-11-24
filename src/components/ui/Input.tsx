@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   Open Motors — Input component
+   OpenMotors — Input component
    Dark-compatible (funciona en fondos oscuros)
    ───────────────────────────────────────────── */
 
@@ -32,7 +32,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
         <div className="relative flex items-center">
           {prefix && (
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/35 text-slate-900/35 pointer-events-none">{prefix}</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/35 text-slate-900/35 pointer-events-none z-10 flex items-center justify-center">
+              {prefix}
+            </span>
           )}
 
           <input
@@ -40,11 +42,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             aria-invalid={error ? true : undefined}
             type={inputType}
+            style={{
+              ...(prefix ? { paddingLeft: '38px' } : {}),
+              ...(suffix || isPass ? { paddingRight: '38px' } : {}),
+              ...props.style,
+            }}
             className={cn(
-              'gm-input-d w-full h-11 pl-[14px]',   // padding-left base
-              prefix  && '!pl-10',                    // con ícono: forzado con !important
-              (suffix || isPass) && 'pr-10',
-              error   && '!border-gm-red/60 !bg-gm-red/[0.04]',
+              'gm-input-d w-full h-[38px] px-3 text-[13px]',
+              prefix && 'has-prefix !pl-[38px]',
+              (suffix || isPass) && 'has-suffix !pr-[38px]',
+              error && '!border-gm-red/60 !bg-gm-red/[0.04]',
               className,
             )}
             {...props}
@@ -54,14 +61,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             <button
               type="button"
               onClick={() => setShow((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 dark:text-white/30 text-slate-900/30 hover:dark:text-white/60 text-slate-900/60 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 dark:text-white/30 text-slate-900/30 hover:dark:text-white/60 text-slate-900/60 transition-colors z-10"
               tabIndex={-1}
             >
               {show ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           )}
           {!isPass && suffix && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 dark:text-white/35 text-slate-900/35">{suffix}</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 dark:text-white/35 text-slate-900/35 z-10 flex items-center justify-center">
+              {suffix}
+            </span>
           )}
         </div>
 

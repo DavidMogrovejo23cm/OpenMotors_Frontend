@@ -5,7 +5,7 @@ import { WORKSHOP_CONTACT } from '../../lib/constants';
 const SECTIONS = [
   {
     title: '1. Información que recopilamos',
-    body: `Recopilamos los siguientes datos personales cuando te registras y usas Open Motors:
+    body: `Recopilamos los siguientes datos personales cuando te registras y usas OpenMotors:
 • Nombre completo, correo electrónico y contraseña cifrada
 • Número de cédula de identidad (RUC para empresas)
 • Número de teléfono de contacto
@@ -30,7 +30,7 @@ const SECTIONS = [
 • Ley Orgánica de Protección de Datos Personales (LOPDP) del Ecuador
 • Reglamento General de Datos Personales (Ecuador)
 • Tu consentimiento explícito al registrarte en la plataforma
-• La ejecución del contrato de servicio entre tú y Open Motors`,
+• La ejecución del contrato de servicio entre tú y OpenMotors`,
   },
   {
     title: '4. Almacenamiento y seguridad',
@@ -138,7 +138,7 @@ export default function PrivacidadPage() {
               Política de Privacidad
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, margin: '3px 0 0' }}>
-              Open Motors · Última actualización: junio 2025 · Ley LOPDP Ecuador
+              OpenMotors · Última actualización: junio 2025 · Ley LOPDP Ecuador
             </p>
           </div>
         </div>
@@ -190,7 +190,7 @@ export default function PrivacidadPage() {
           borderRadius: 12, textAlign: 'center',
         }}>
           <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, margin: 0 }}>
-            © 2025 Open Motors · Ecuador ·{' '}
+            © 2025 OpenMotors · Ecuador ·{' '}
             <Link to="/terminos" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>
               Términos de Uso
             </Link>

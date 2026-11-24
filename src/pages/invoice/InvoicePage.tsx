@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Nota de Servicio / Comprobante
+   OpenMotors — Nota de Servicio / Comprobante
    Diseño premium · datos del técnico · logo
    ───────────────────────────────────────────── */
 
@@ -28,14 +28,12 @@ interface DetalleFila {
 const ESTADO_LABEL: Record<number, { label: string; color: string }> = {
   0: { label: 'Pendiente',  color: '#F59E0B' },
   1: { label: 'En proceso', color: '#3B82F6' },
-  2: { label: 'Completado', color: '#10B981' },
+  2: { label: 'Finalizada', color: '#10B981' },
   3: { label: 'Entregado',  color: '#8B5CF6' },
-  4: { label: 'Facturado',  color: '#14B8A6' },
 };
 
 const genNumero = ordenNumero;
 
-const REGISTROS_PATH = '/registros';
 export default function InvoicePage() {
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -47,7 +45,7 @@ export default function InvoicePage() {
   const [detalles,  setDetalles]  = useState<DetalleFila[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
-  const returnPath = id?.startsWith('f_') ? '/inventario' : REGISTROS_PATH;
+  const returnPath = id?.startsWith('f_') ? '/inventario' : `/ordenes/${id}`;
 
   const handleBack = (event?: SyntheticEvent<HTMLElement>) => {
     event?.preventDefault();
@@ -74,7 +72,9 @@ export default function InvoicePage() {
               id_vehiculo: 0,
               id_factura: factura.id_factura,
               fecha: factura.fecha_emision || factura.fecha,
-              estado: 4, // Facturado
+              estado: 3, // Venta directa, sin flujo de taller
+              estado_pago: 'PAGADO',
+              monto_pagado: factura.costo_total,
               costo_total: factura.costo_total,
               nombre_cliente: factura.cliente_nombre || 'Consumidor final',
               cliente_cedula: factura.cliente_cedula,
@@ -82,7 +82,7 @@ export default function InvoicePage() {
               cliente_correo: factura.cliente_correo,
               cliente_direccion: factura.cliente_direccion,
               placa: 'VENTA DIRECTA',
-              marca_vehiculo: 'Open Motors',
+              marca_vehiculo: 'OpenMotors',
               modelo_vehiculo: 'Inventario',
               ruta_imagen_vehiculo: null,
               descripcion: 'Venta de mostrador',
@@ -154,14 +154,14 @@ export default function InvoicePage() {
   const correoCliente = reg.cliente_correo || '';
   const direccionCliente = reg.cliente_direccion || '';
   const estInfo  = ESTADO_LABEL[reg.estado] ?? ESTADO_LABEL[0];
-  const mecanico = reg.nombre_encargado ?? 'Técnico Open Motors';
+  const mecanico = reg.nombre_encargado ?? 'Técnico OpenMotors';
 
   /* Quién despachó / cobró el pedido: el encargado del registro;
      si no existe, el usuario que emite el comprobante; en último caso, el cliente. */
   const despachadoPor = reg.nombre_encargado
     ?? user?.nombre_completo
     ?? reg.nombre_cliente
-    ?? 'Open Motors';
+    ?? 'OpenMotors';
   /* Desde qué cuenta se realizó el comprobante (usuario autenticado). */
   const cuentaEmisora = user?.correo
     ?? (user?.nombre_usuario ? `@${user.nombre_usuario}` : null)
@@ -225,13 +225,13 @@ export default function InvoicePage() {
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 relative bg-white shadow-sm"
                    style={{ border: '1px solid rgba(220,38,38,0.2)' }}>
-                <img src="/brand/open-motor-logo.png" alt="Open Motors"
+                <img src="/brand/open-motor-logo.png" alt="OpenMotors"
                      className="w-full h-full object-cover relative z-10"
                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
               <div>
                 <h1 className="font-black text-2xl leading-none" style={{ color: '#991B1B', fontFamily: "'Inter', sans-serif", letterSpacing: '-0.5px' }}>
-                  Open Motors
+                  OpenMotors
                 </h1>
                 <p style={{ color: '#7F1D1D', fontSize: 11, marginTop: 4, opacity: 0.8 }}>
                   {WORKSHOP_CONTACT.direccion}
@@ -267,6 +267,7 @@ export default function InvoicePage() {
             {reg.fecha_entrega_estimada && (
               <span><strong className="text-gray-700">Entrega estimada:</strong> {fmtDate(reg.fecha_entrega_estimada)}</span>
             )}
+            <span><strong className="text-gray-700">Pago:</strong> {reg.estado_pago ?? 'PENDIENTE'} · Cobrado: {fmtMoney(reg.monto_pagado ?? 0)} · Saldo: {fmtMoney(reg.saldo_pendiente ?? reg.costo_total)}</span>
             <span><strong className="text-gray-700">Emision:</strong> {fmtDate(reg.fecha_facturado || reg.fecha)}</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold"
@@ -308,7 +309,7 @@ export default function InvoicePage() {
               Datos del Vehículo
             </h2>
 
-            {/* Hero foto moto */}
+            {/* Hero foto carro */}
             {reg.ruta_imagen_vehiculo ? (
               <div className="relative rounded-2xl overflow-hidden mb-3" style={{ height: 110 }}>
                 <img
@@ -563,7 +564,7 @@ export default function InvoicePage() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <a href={whatsappCitaLink('Hola, quiero agendar una cita en Open Motors')}
+            <a href={whatsappCitaLink('Hola, quiero agendar una cita en OpenMotors')}
                target="_blank" rel="noopener noreferrer"
                style={{ color: '#25D366', fontSize: 10, fontWeight: 700, display:'flex', alignItems:'center', gap:4 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
@@ -572,7 +573,7 @@ export default function InvoicePage() {
               WhatsApp citas
             </a>
             <p style={{ color: '#E11428', fontSize: 10, fontWeight: 700 }}>
-              Open Motors © {new Date().getFullYear()}
+              OpenMotors © {new Date().getFullYear()}
             </p>
           </div>
         </div>

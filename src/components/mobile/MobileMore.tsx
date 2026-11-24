@@ -1,10 +1,10 @@
 /* ─────────────────────────────────────────────
-   GMotors — Menú "Más" móvil (solo APK)
+   OpenMotors — Menú "Más" móvil (solo APK)
    Hub premium con acceso a TODOS los módulos del usuario,
    agrupados de forma lógica. Reemplaza el drawer en el APK.
    ───────────────────────────────────────────── */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wrench, Car, Package, Truck, UserCheck, CreditCard, Users, ClipboardList, Fuel, Wallet, BookOpen, Globe, LogOut, X, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Wrench, Car, Package, Truck, UserCheck, CreditCard, Users, ClipboardList, Fuel, Wallet, BookOpen, Globe, LogOut, X, Clock, type LucideIcon } from 'lucide-react';
 import { initials } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -13,8 +13,8 @@ import { useAuth } from '../../contexts/AuthContext';
 function rutasDelTabBar(esClientePuro: boolean): Set<string> {
   return new Set(
     esClientePuro
-      ? ['/dashboard', '/mi-moto']
-      : ['/dashboard', '/registros', '/motos', '/inventario'],
+      ? ['/dashboard', '/mi-carro']
+      : ['/dashboard', '/registros', '/carros', '/inventario'],
   );
 }
 
@@ -23,14 +23,14 @@ interface NavItem { label: string; to: string }
 const ICONS: Record<string, LucideIcon> = {
   'Dashboard': LayoutDashboard, 'Registros': Wrench, 'Vehículos': Car,
   'Inventario': Package, 'Proveedores': Truck, 'Clientes': UserCheck,
-  'Pagos': CreditCard, 'Contabilidad': Wallet, 'Perfiles': Users,
+  'Pagos': CreditCard, 'Contabilidad': Wallet, 'Perfiles': Users, 'Personal': Clock,
   'Mis vehículos': Car, 'Mi Portal': Globe,
   'Diagnóstico': ClipboardList, 'Metodología': BookOpen, 'Combustible': Fuel,
 };
 const COLORS: Record<string, string> = {
   'Dashboard': '#3B82F6', 'Registros': '#E11428', 'Vehículos': '#3B82F6',
   'Inventario': '#F59E0B', 'Proveedores': '#14B8A6', 'Clientes': '#10B981',
-  'Pagos': '#8B5CF6', 'Contabilidad': '#10B981', 'Perfiles': '#8B5CF6',
+  'Pagos': '#8B5CF6', 'Contabilidad': '#10B981', 'Perfiles': '#8B5CF6', 'Personal': '#3B82F6',
   'Mis vehículos': '#3B82F6', 'Mi Portal': '#10B981',
   'Alertas': '#E11428', 'Diagnóstico': '#F59E0B', 'Metodología': '#14B8A6',
   'Combustible': '#8B5CF6',
@@ -42,7 +42,7 @@ const GROUPS: { title: string; labels: string[] }[] = [
   { title: 'Inventario y compras', labels: ['Inventario', 'Proveedores'] },
   { title: 'Clientes',            labels: ['Clientes', 'Mis vehículos', 'Mi Portal'] },
   { title: 'Finanzas',            labels: ['Pagos', 'Contabilidad'] },
-  { title: 'Administración',      labels: ['Perfiles'] },
+  { title: 'Administración',      labels: ['Perfiles', 'Personal'] },
 ];
 
 export default function MobileMore({
@@ -125,7 +125,7 @@ export default function MobileMore({
           </button>
         </div>
 
-        <p className="m-more-foot">Open Motors · Cuenca, Ecuador</p>
+        <p className="m-more-foot">OpenMotors · Cuenca, Ecuador</p>
       </div>
     </div>
   );

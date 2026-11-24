@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Página de Ajustes / Configuración
+   OpenMotors — Página de Ajustes / Configuración
    APK-first · perfil · tema · notificaciones · soporte
    ───────────────────────────────────────────── */
 
@@ -247,13 +247,13 @@ export default function AjustesPage() {
           color='#10B981'
           label="Contactar soporte"
           sub={`WhatsApp: ${WORKSHOP_CONTACT.telefonoSoporte}`}
-          onClick={() => window.open(`https://wa.me/${WORKSHOP_CONTACT.whatsappSoporte}?text=${encodeURIComponent('Hola, necesito ayuda con la app Open Motors')}`, '_blank')}
+          onClick={() => window.open(`https://wa.me/${WORKSHOP_CONTACT.whatsappSoporte}?text=${encodeURIComponent('Hola, necesito ayuda con la app OpenMotors')}`, '_blank')}
         />
         <Row
           icon={<Phone size={18} />}
           color='#14B8A6'
           label="Llamar al taller"
-          sub={`${WORKSHOP_CONTACT.telefonoSoporte} · Open Motors`}
+          sub={`${WORKSHOP_CONTACT.telefonoSoporte} · OpenMotors`}
           onClick={() => window.open(`tel:${WORKSHOP_CONTACT.telefonoSoporte.replace(/\s/g, '')}`, '_blank')}
         />
         <Row
@@ -302,7 +302,7 @@ export default function AjustesPage() {
         <Row
           icon={<Info size={18} />}
           color='#8B8FA8'
-          label="Open Motors"
+          label="OpenMotors"
           sub={`Versión ${APP_VERSION} · ${WORKSHOP_CONTACT.ciudadCompleta}`}
           last
         />

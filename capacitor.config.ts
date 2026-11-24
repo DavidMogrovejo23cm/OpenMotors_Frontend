@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId:    'com.openmotors.app',
-  appName:  'Open Motors',
+  appName:  'OpenMotors',
   webDir:   'dist',
   server: {
     /* Para desarrollo local apunta al backend */

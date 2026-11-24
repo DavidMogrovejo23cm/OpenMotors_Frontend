@@ -1,8 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      stream: path.resolve(__dirname, 'src/lib/mocks/streamMock.ts'),
+    },
+  },
   /* base relativa ('./') para que los assets carguen dentro del APK (WebView
      en https://localhost) sin importar cómo resuelva la raíz. */
   base: './',
@@ -11,6 +21,7 @@ export default defineConfig({
     open: true,
     proxy: {
       /* Redirige /api al backend FastAPI en desarrollo */
+      '/static': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/api': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,

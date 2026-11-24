@@ -5,7 +5,7 @@ import { WORKSHOP_CONTACT } from '../../lib/constants';
 const SECTIONS = [
   {
     title: '1. Descripción del servicio',
-    body: `Open Motors es una plataforma de software como servicio (SaaS) diseñada para la gestión integral de talleres automotrices en Ecuador. El servicio incluye:
+    body: `OpenMotors es una plataforma de software como servicio (SaaS) diseñada para la gestión integral de talleres automotrices en Ecuador. El servicio incluye:
 • Módulo de órdenes de trabajo y seguimiento de servicios
 • Gestión de inventario y control de repuestos
 • Registro de clientes y vehículos
@@ -22,11 +22,11 @@ const SECTIONS = [
 • Notificarnos de inmediato ante cualquier uso no autorizado de tu cuenta
 • Ser mayor de 18 años o contar con autorización legal
 
-Eres responsable de todas las acciones realizadas bajo tu cuenta. Open Motors no será responsable por pérdidas causadas por el uso no autorizado de tu cuenta si no se nos notificó oportunamente.`,
+Eres responsable de todas las acciones realizadas bajo tu cuenta. OpenMotors no será responsable por pérdidas causadas por el uso no autorizado de tu cuenta si no se nos notificó oportunamente.`,
   },
   {
     title: '3. Uso permitido del servicio',
-    body: `Al usar Open Motors te comprometes a:
+    body: `Al usar OpenMotors te comprometes a:
 • Usar el servicio únicamente para fines legítimos de gestión de taller
 • No compartir tu acceso con personas no autorizadas
 • No intentar acceder a cuentas de otros usuarios
@@ -42,11 +42,11 @@ Eres responsable de todas las acciones realizadas bajo tu cuenta. Open Motors no
 • El cumplimiento de obligaciones tributarias (IVA 15%, retenciones, etc.)
 • La configuración correcta de datos del establecimiento emisor
 
-Open Motors proporciona herramientas de apoyo para la facturación pero no es un agente de retención ni contribuyente delegado. Consulta siempre con tu contador.`,
+OpenMotors proporciona herramientas de apoyo para la facturación pero no es un agente de retención ni contribuyente delegado. Consulta siempre con tu contador.`,
   },
   {
     title: '5. Disponibilidad del servicio',
-    body: `Open Motors opera en servidores de Render.com (plan gratuito en etapa inicial). Por esto:
+    body: `OpenMotors opera en servidores de Render.com (plan gratuito en etapa inicial). Por esto:
 • El servicio puede experimentar tiempos de inicio de hasta 50 segundos tras períodos de inactividad
 • No garantizamos disponibilidad del 99.9% SLA en el plan actual
 • Realizamos mantenimientos programados con previo aviso cuando sea posible
@@ -56,18 +56,18 @@ En fases futuras del servicio se ofrecerán planes con mayores garantías de dis
   },
   {
     title: '6. Propiedad intelectual',
-    body: `Todo el contenido, diseño, código fuente, marcas, logotipos y materiales de Open Motors son propiedad exclusiva de sus desarrolladores y están protegidos por las leyes de propiedad intelectual del Ecuador e internacionales. Se concede una licencia limitada, no exclusiva e intransferible para usar el servicio. Está prohibida cualquier reproducción o uso no autorizado.`,
+    body: `Todo el contenido, diseño, código fuente, marcas, logotipos y materiales de OpenMotors son propiedad exclusiva de sus desarrolladores y están protegidos por las leyes de propiedad intelectual del Ecuador e internacionales. Se concede una licencia limitada, no exclusiva e intransferible para usar el servicio. Está prohibida cualquier reproducción o uso no autorizado.`,
   },
   {
     title: '7. Limitación de responsabilidad',
-    body: `Open Motors no será responsable por:
+    body: `OpenMotors no será responsable por:
 • Pérdida de datos causada por fallas de terceros (proveedores de infraestructura)
 • Daños indirectos, incidentales o emergentes derivados del uso del servicio
 • Decisiones comerciales tomadas con base en la información del sistema
 • Errores en declaraciones tributarias ante el SRI
 • Interrupciones del servicio fuera de nuestro control (fuerza mayor, fallas de internet)
 
-La responsabilidad máxima de Open Motors en cualquier caso estará limitada al valor pagado por el servicio en los últimos 3 meses.`,
+La responsabilidad máxima de OpenMotors en cualquier caso estará limitada al valor pagado por el servicio en los últimos 3 meses.`,
   },
   {
     title: '8. Modificaciones al servicio',
@@ -148,7 +148,7 @@ export default function TerminosPage() {
               Términos de Uso
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, margin: '3px 0 0' }}>
-              Open Motors · Última actualización: junio 2025 · Ecuador
+              OpenMotors · Última actualización: junio 2025 · Ecuador
             </p>
           </div>
         </div>
@@ -162,7 +162,7 @@ export default function TerminosPage() {
           marginBottom: 40, marginTop: 28,
         }}>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0, lineHeight: 1.7 }}>
-            <strong style={{ color: '#fff' }}>Al usar Open Motors aceptas estos términos.</strong> En resumen: usa el servicio honestamente para gestionar tu taller, eres responsable de tus datos tributarios, y nos comprometemos a proteger tu información y darte un servicio confiable.
+            <strong style={{ color: '#fff' }}>Al usar OpenMotors aceptas estos términos.</strong> En resumen: usa el servicio honestamente para gestionar tu taller, eres responsable de tus datos tributarios, y nos comprometemos a proteger tu información y darte un servicio confiable.
           </p>
         </div>
 
@@ -188,7 +188,7 @@ export default function TerminosPage() {
           borderRadius: 12, textAlign: 'center',
         }}>
           <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, margin: 0 }}>
-            © 2025 Open Motors · Ecuador ·{' '}
+            © 2025 OpenMotors · Ecuador ·{' '}
             <Link to="/privacidad" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>
               Política de Privacidad
             </Link>

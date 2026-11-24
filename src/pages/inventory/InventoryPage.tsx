@@ -1,5 +1,6 @@
+import { Link, useSearchParams } from 'react-router-dom';
 /* ─────────────────────────────────────────────
-   Open Motors — Inventario
+   OpenMotors — Inventario
    Dark redesign, tabla completa, GSAP entrance
    ───────────────────────────────────────────── */
 
@@ -10,24 +11,27 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import gsap from 'gsap';
-import { productosApi, categoriasApi, usuariosApi, motosApi, facturasApi, detallesFacturaApi, proveedorContactosApi } from '../../lib/api';
+import { productosApi, categoriasApi, usuariosApi, carrosApi, facturasApi, detallesFacturaApi, proveedorContactosApi } from '../../lib/api';
 import { isNativeApp } from '../../lib/platform';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { extractCedula, extractPhone, fmtMoney, getErrorMsg, nextProductCode } from '../../lib/utils';
 import { comprimirImagen } from '../../lib/fotos';
-import type { Producto, Categoria, Usuario, Moto } from '../../types';
+import type { Producto, Categoria, Usuario, Carro } from '../../types';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
+import BarcodeCamera from '../../components/inventory/BarcodeCamera';
 
 const schema = z.object({
   nombre:            z.string().min(1, 'Requerido'),
   descripcion:       z.string().nullish().transform(v => v || ''),
   codigo_proveedor:  z.string().nullish().transform(v => v || ''),
   codigo_distribuidor: z.string().nullish().transform(v => v || ''),
+  codigo_barras: z.string().nullish().transform(v => v || ''),
+  stock_minimo: z.coerce.number().int().min(0),
   codigo_personal:   z.string().nullish().transform(v => v || ''),
   costo:             z.coerce.number({ error: 'El costo debe ser un número válido' }).min(0, 'Inválido'),
   pvp:               z.coerce.number({ error: 'El PVP debe ser un número válido' }).min(0, 'Inválido'),
@@ -73,12 +77,15 @@ function SkeletonRow() {
 }
 
 export default function InventoryPage() {
+  const [searchParams] = useSearchParams();
+  const pendingBarcode = useRef(searchParams.get('codigo'));
   const pageRef = useRef<HTMLDivElement>(null);
   const toast   = useToast();
   const [theme] = useTheme();
   const isDark  = theme === 'dark';
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const canEdit = isAdmin || (user?.permisos?.includes("inventario_entradas") ?? false);
 
   // Estados principales
   const [productos,    setProductos]    = useState<Producto[]>([]);
@@ -88,6 +95,7 @@ export default function InventoryPage() {
   const [saving,       setSaving]       = useState(false);
   const [search,       setSearch]       = useState('');
   const [catFilter,    setCatFilter]    = useState(0);
+  const [barcodeCameraOpen, setBarcodeCameraOpen] = useState(false);
   const [modalOpen,      setModalOpen]      = useState(false);
   const [editTarget,     setEditTarget]     = useState<Producto | null>(null);
   const [deleteTarget,   setDeleteTarget]   = useState<Producto | null>(null);
@@ -200,25 +208,36 @@ export default function InventoryPage() {
     return () => ctx.revert();
   }, [loading]);
 
-  const openCreate = () => {
+  const openCreate = useCallback(() => {
     setImageFile(null);
     setPreviewUrl(null);
     setEditTarget(null);
     reset({
+      codigo_barras: '', stock_minimo: 2,
       nombre: '', descripcion: '', codigo_proveedor: '', costo: 0, pvp: 0, stock: 0, id_categoria: undefined,
       fecha_registro:     new Date().toISOString().slice(0, 10),
       fecha_modificacion: new Date().toISOString().slice(0, 10),
       codigo_personal:    nextProductCode(productos.map((p) => p.codigo_personal)),
       codigo_distribuidor: '',
     });
+    setBarcodeCameraOpen(false);
     setModalOpen(true);
-  };
+  }, [productos, reset]);
+
+  useEffect(() => {
+    if (loading || !canEdit || !pendingBarcode.current) return;
+    const code = pendingBarcode.current;
+    pendingBarcode.current = null;
+    openCreate();
+    setValue('codigo_barras', code, { shouldDirty: true, shouldValidate: true });
+  }, [loading, canEdit, openCreate, setValue]);
 
   const openEdit = (p: Producto) => {
     setImageFile(null);
     setPreviewUrl(null);
     setEditTarget(p);
     reset({
+      codigo_barras: p.codigo_barras || '', stock_minimo: p.stock_minimo ?? 2,
       nombre: p.nombre || '', descripcion: p.descripcion || '',
       codigo_proveedor: p.codigo_proveedor || '', codigo_personal: p.codigo_personal || '',
       codigo_distribuidor: p.codigo_distribuidor || '',
@@ -226,6 +245,7 @@ export default function InventoryPage() {
       fecha_registro: p.fecha_registro || new Date().toISOString().slice(0, 10),
       fecha_modificacion: new Date().toISOString().slice(0, 10),
     });
+    setBarcodeCameraOpen(false);
     setModalOpen(true);
   };
 
@@ -243,7 +263,8 @@ export default function InventoryPage() {
         finalUrl = uploadRes.url;
       }
 
-      const submissionData = { ...data, ruta_imagenproductos: finalUrl };
+      const submissionData: Record<string, unknown> = { ...data, ruta_imagenproductos: finalUrl };
+      if (editTarget && data.stock === editTarget.stock) delete submissionData.stock;
 
       if (editTarget) {
         await productosApi.update(editTarget.id_producto, submissionData);
@@ -252,6 +273,7 @@ export default function InventoryPage() {
         await productosApi.create(submissionData);
         toast.success('Producto creado');
       }
+      setBarcodeCameraOpen(false);
       setModalOpen(false);
       fetchData();
     } catch (err) { toast.error(getErrorMsg(err)); }
@@ -458,15 +480,15 @@ export default function InventoryPage() {
           setVnNotFound(true);
         }
       } else {
-        const [{ data: motos }, { data: usuarios }] = await Promise.all([
-          motosApi.list(),
+        const [{ data: carros }, { data: usuarios }] = await Promise.all([
+          carrosApi.list(),
           usuariosApi.list(),
         ]);
-        const moto = (motos as Moto[]).find(
+        const carro = (carros as Carro[]).find(
           (m) => m.placa.toUpperCase() === q.toUpperCase()
         );
-        if (!moto) { setVnNotFound(true); return; }
-        const usuario = (usuarios as Usuario[]).find((u) => u.id_usuario === moto.id_usuario);
+        if (!carro) { setVnNotFound(true); return; }
+        const usuario = (usuarios as Usuario[]).find((u) => u.id_usuario === carro.id_usuario);
         if (usuario) {
           setVnCliente({
             nombre: usuario.nombre_completo,
@@ -669,9 +691,10 @@ export default function InventoryPage() {
     categorias.find((c) => c.id_categoria === id)?.nombre ?? '—';
 
   const filtered = productos.filter((p) => {
-    const q        = search.toLowerCase();
+    const q        = search.trim().toLowerCase();
     const provName = proveedores.find(pr => pr.codigo === p.codigo_proveedor)?.nombre || '';
-    const matchQ   = p.nombre.toLowerCase().includes(q) || 
+    const matchQ   = p.nombre.toLowerCase().includes(q) ||
+                     (p.codigo_barras || '').toLowerCase().includes(q) ||
                      p.codigo_personal.toLowerCase().includes(q) || 
                      (p.codigo_distribuidor || '').toLowerCase().includes(q) ||
                      (p.codigo_proveedor || '').toLowerCase().includes(q) || 
@@ -707,9 +730,11 @@ export default function InventoryPage() {
           <h1 className="text-[1.9rem] font-black dark:text-white text-slate-900 leading-tight tracking-tight">Inventario</h1>
           <p className="dark:text-white/35 text-slate-900/35 text-sm mt-1">{productos.length} productos registrados</p>
         </div>
-        <div className="flex items-center gap-2.5">
-          <Button variant="secondary" icon={<Tags size={15} />} onClick={() => setCatModalOpen(true)}>Categorías</Button>
-          <Button icon={<Plus size={15} />} onClick={openCreate}>Nuevo producto</Button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {canEdit && <Link to="/inventario/escaneo?tipo=entrada" className="gm-input-d">Escanear entrada (+)</Link>}
+          {(isAdmin || user?.permisos?.includes('inventario_consumos')) && <Link to="/inventario/escaneo?tipo=salida" className="gm-input-d">Escanear salida (−)</Link>}
+          {canEdit && (<Button variant="secondary" icon={<Tags size={15} />} onClick={() => setCatModalOpen(true)}>Categorías</Button>)}
+          {canEdit && (<Button icon={<Plus size={15} />} onClick={openCreate}>Nuevo producto</Button>)}
         </div>
       </div>
 
@@ -857,7 +882,7 @@ export default function InventoryPage() {
                       <td className="font-bold dark:text-white/85 text-slate-900/85 tabular-nums">{fmtMoney(p.pvp)}</td>
                       <td>
                         <div className="flex items-center gap-1.5">
-                          <button
+                          {isAdmin && (<button
                             onClick={() => { setSellTarget(p); setSellQty('1'); }}
                             className="icon-btn"
                             title="Venta rápida (sin cliente)"
@@ -865,8 +890,8 @@ export default function InventoryPage() {
                             style={p.stock <= 0 ? { opacity: 0.3, cursor: 'not-allowed' } : { color: '#10B981' }}
                           >
                             <ShoppingCart size={13} />
-                          </button>
-                          <button
+                          </button>)}
+                          {isAdmin && (<button
                             onClick={() => {
                               setVnTarget(p); setVnStep('search'); setVnQuery('');
                               setVnCliente(null); setVnNotFound(false); setVnQty('1');
@@ -877,8 +902,8 @@ export default function InventoryPage() {
                             style={p.stock <= 0 ? { opacity: 0.3, cursor: 'not-allowed' } : { color: '#60A5FA' }}
                           >
                             <UserCheck size={13} />
-                          </button>
-                          <button
+                          </button>)}
+                          {canEdit && (<button
                             onClick={() => handlePhotoClick(p)}
                             className="icon-btn"
                             title={p.ruta_imagenproductos ? 'Cambiar foto' : 'Subir foto'}
@@ -886,13 +911,13 @@ export default function InventoryPage() {
                             style={{ color: p.ruta_imagenproductos ? '#10B981' : undefined, opacity: photoUploading[p.id_producto] ? 0.5 : 1 }}
                           >
                             <Camera size={13} />
-                          </button>
-                          <button onClick={() => openEdit(p)} className="icon-btn" title="Editar">
+                          </button>)}
+                          {canEdit && (<button onClick={() => openEdit(p)} className="icon-btn" title="Editar">
                             <Pencil size={13} />
-                          </button>
-                          <button onClick={() => setDeleteTarget(p)} className="icon-btn danger" title="Eliminar">
+                          </button>)}
+                          {isAdmin && (<button onClick={() => setDeleteTarget(p)} className="icon-btn danger" title="Eliminar">
                             <Trash2 size={13} />
-                          </button>
+                          </button>)}
                         </div>
                       </td>
                     </tr>
@@ -906,12 +931,12 @@ export default function InventoryPage() {
       {/* ─── Modal crear/editar ─── */}
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setBarcodeCameraOpen(false); setModalOpen(false); }}
         title={editTarget ? 'Editar producto' : 'Nuevo producto'}
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => { setBarcodeCameraOpen(false); setModalOpen(false); }}>Cancelar</Button>
             <Button form="product-form" type="submit" loading={saving}>
               {editTarget ? 'Guardar cambios' : 'Crear producto'}
             </Button>
@@ -932,6 +957,8 @@ export default function InventoryPage() {
             <Input label="Nombre" placeholder="Nombre del producto" error={errors.nombre?.message} {...register('nombre')} />
             <Input label="Código personal" placeholder="COD-001" error={errors.codigo_personal?.message} {...register('codigo_personal')} />
           </div>
+          <div className="grid sm:grid-cols-2 gap-4"><div className="space-y-2"><Input label="Código de barras" placeholder="Escanea o escribe el código único" error={errors.codigo_barras?.message} {...register('codigo_barras')} /><Button type="button" variant="secondary" icon={<Camera size={16} />} disabled={saving || barcodeCameraOpen} onClick={() => setBarcodeCameraOpen(true)}>Leer etiqueta con teléfono</Button></div><Input label="Existencia mínima" type="number" min={0} step={1} error={errors.stock_minimo?.message} {...register('stock_minimo')} /></div>
+          {modalOpen && barcodeCameraOpen && <BarcodeCamera onClose={() => setBarcodeCameraOpen(false)} onRead={code => { setValue('codigo_barras', code, { shouldDirty: true, shouldValidate: true }); setBarcodeCameraOpen(false); toast.success('Código leído. Guarda el producto para asociar su etiqueta.'); }} />}
           <Input label="Código del distribuidor" placeholder="Ej. MT09 / código de compra IMMER" error={errors.codigo_distribuidor?.message} {...register('codigo_distribuidor')} />
           <div>
             <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5 flex justify-between items-center">
@@ -1134,7 +1161,7 @@ export default function InventoryPage() {
                     <p className="text-[11px] dark:text-white/35 text-slate-900/35 truncate">{c.descripcion || 'Sin descripción'} · {count} producto{count !== 1 ? 's' : ''}</p>
                   </div>
                   <button onClick={() => editCategoria(c)} className="icon-btn" title="Editar"><Pencil size={12} /></button>
-                  <button onClick={() => deleteCategoria(c)} className="icon-btn danger" title="Eliminar"><Trash2 size={12} /></button>
+                  {isAdmin && (<button onClick={() => deleteCategoria(c)} className="icon-btn danger" title="Eliminar"><Trash2 size={12} /></button>)}
                 </div>
               );
             })}
@@ -1230,7 +1257,7 @@ export default function InventoryPage() {
                 <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/30 text-slate-900/30 pointer-events-none" />
                 <input
                   type="email"
-                  className="gm-input-d w-full pl-8"
+                  className="gm-input-d w-full has-prefix !pl-9"
                   placeholder="cliente@correo.com"
                   value={sellEmail}
                   onChange={e => setSellEmail(e.target.value)}
@@ -1326,7 +1353,7 @@ export default function InventoryPage() {
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/30 text-slate-900/30 pointer-events-none" />
                   <input
-                    className="gm-input-d w-full pl-8"
+                    className="gm-input-d w-full has-prefix !pl-9"
                     placeholder="Nombre o correo electrónico..."
                     value={vnQuery}
                     onChange={(e) => setVnQuery(e.target.value)}
@@ -1464,7 +1491,7 @@ export default function InventoryPage() {
       <Modal
         open={addStockOpen}
         onClose={() => setAddStockOpen(false)}
-        title="➕ Añadir Stock a este lote"
+        title="Añadir stock al lote"
         size="sm"
         footer={
           <>

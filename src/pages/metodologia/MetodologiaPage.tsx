@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Metodología de mantenimiento
+   OpenMotors — Metodología de mantenimiento
    Panel informativo: cómo calculamos los intervalos
    según el cilindraje. Visible para admin / mecánico.
    ───────────────────────────────────────────── */

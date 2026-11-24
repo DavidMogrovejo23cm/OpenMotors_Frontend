@@ -1,16 +1,16 @@
 /* ─────────────────────────────────────────────
-   GMotors — Portal del Cliente
-   Vista personalizada: mis motos, historial,
+   OpenMotors — Portal del Cliente
+   Vista personalizada: mis carros, historial,
    y seguimiento de mantenimiento
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Car, ChevronRight } from 'lucide-react';
-import { motosApi, registrosApi } from '../../lib/api';
+import { carrosApi, registrosApi } from '../../lib/api';
 import { usePolling } from '../../hooks/usePolling';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Moto, RegistroDetalle } from '../../types';
+import type { Carro, RegistroDetalle } from '../../types';
 import { fmtDate, fmtMoney, toIsoStr } from '../../lib/utils';
 
 
@@ -34,7 +34,7 @@ function getUrgency(kmSince: number | null, thr: number) {
 
 export default function PortalClientePage() {
   const { user } = useAuth();
-  const [motos,    setMotos]    = useState<Moto[]>([]);
+  const [carros,    setCarros]    = useState<Carro[]>([]);
   const [registros,setRegistros]= useState<RegistroDetalle[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [filterPlaca, setFilterPlaca] = useState('');
@@ -42,16 +42,16 @@ export default function PortalClientePage() {
     const uid = user?.id_usuario;
     if (uid == null) { setLoading(false); return; }
     const [mr, rr] = await Promise.allSettled([
-      motosApi.byUser(uid), registrosApi.byClient(uid),
+      carrosApi.byUser(uid), registrosApi.byClient(uid),
     ]);
-    const allMotos:    Moto[]            = mr.status === 'fulfilled' ? mr.value.data : [];
+    const allCarros:    Carro[]            = mr.status === 'fulfilled' ? mr.value.data : [];
     const allRegistros:RegistroDetalle[] = rr.status === 'fulfilled' ? rr.value.data : [];
-    const myMotos    = allMotos.filter(m => m.id_usuario === uid);
-    const myPlacas   = new Set(myMotos.map(m => m.placa));
+    const myCarros    = allCarros.filter(m => m.id_usuario === uid);
+    const myPlacas   = new Set(myCarros.map(m => m.placa));
     const myRegistros= allRegistros.filter(r => myPlacas.has(r.placa))
                                    .sort((a,b) => toIsoStr(b.fecha).localeCompare(toIsoStr(a.fecha)));
 
-    setMotos(myMotos);
+    setCarros(myCarros);
     setRegistros(myRegistros);
     setLoading(false);
   }, [user]);
@@ -61,8 +61,8 @@ export default function PortalClientePage() {
   /* Refresco en tiempo real: el cliente ve nuevos servicios/km sin recargar */
   usePolling(load, { intervalMs: 25_000 });
 
-  /* Alertas de aceite por moto */
-  const oilAlerts = useMemo(() => motos.map(m => {
+  /* Alertas de aceite por carro */
+  const oilAlerts = useMemo(() => carros.map(m => {
     const oilRecs = registros
       .filter(r => r.placa === m.placa &&
         ['aceite','cambio de aceite'].some(k => r.tipo_servicio?.toLowerCase().includes(k)))
@@ -71,8 +71,8 @@ export default function PortalClientePage() {
     const lastKm = oilRecs[0]?.kilometraje ?? null;
     const thr    = oilThreshold(m.cilindraje);
     const kmSince = lastKm != null ? m.kilometraje - lastKm : null;
-    return { moto: m, kmSince, thr, urgency: getUrgency(kmSince, thr) };
-  }), [motos, registros]);
+    return { carro: m, kmSince, thr, urgency: getUrgency(kmSince, thr) };
+  }), [carros, registros]);
 
   const gastoTotal = registros.reduce((s, r) => s + (r.costo_total ?? 0), 0);
 
@@ -109,7 +109,7 @@ export default function PortalClientePage() {
           {/* KPIs rápidos */}
           <div className="flex items-center gap-0 bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
             {[
-              { label: 'Vehículos',    value: motos.length,      color: '#3B82F6' },
+              { label: 'Vehículos',    value: carros.length,      color: '#3B82F6' },
               { label: 'Servicios',value: registros.length,  color: '#E11428' },
             ].map(({ label, value, color }, i, arr) => (
               <div key={label} className="flex items-center">
@@ -124,26 +124,26 @@ export default function PortalClientePage() {
         </div>
       </div>
 
-      {/* ── Mis motos ── */}
+      {/* ── Mis carros ── */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-black dark:text-white/80 text-slate-900/80">Mis vehículos</h2>
-          <Link to="/motos" className="text-[11px] text-gm-red font-bold hover:text-gm-red-lt flex items-center gap-1">
+          <Link to="/carros" className="text-[11px] text-gm-red font-bold hover:text-gm-red-lt flex items-center gap-1">
             Administrar <ChevronRight size={11} />
           </Link>
         </div>
-        {motos.length === 0 ? (
+        {carros.length === 0 ? (
           <div className="gm-card-d rounded-2xl py-10 text-center">
             <Car size={28} className="mx-auto mb-2 dark:text-white/15 text-slate-900/15" />
             <p className="dark:text-white/30 text-slate-900/30 text-sm">Sin vehículos registrados</p>
-            <Link to="/motos" className="mt-3 inline-flex text-gm-red text-sm font-bold">
+            <Link to="/carros" className="mt-3 inline-flex text-gm-red text-sm font-bold">
               Registrar vehículo →
             </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {motos.map(m => {
-              const alert = oilAlerts.find(a => a.moto.id_vehiculo === m.id_vehiculo);
+            {carros.map(m => {
+              const alert = oilAlerts.find(a => a.carro.id_vehiculo === m.id_vehiculo);
               const cfg   = URGENCY_CFG[alert?.urgency ?? 'ok'];
               const pct   = alert?.kmSince != null
                 ? Math.min(Math.round((alert.kmSince / alert.thr) * 100), 100) : 0;
@@ -227,15 +227,15 @@ export default function PortalClientePage() {
                       <td>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
                               style={{
-                                background: r.estado >= 3 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                                color:      r.estado >= 3 ? '#10B981' : '#F59E0B',
+                                background: r.estado_pago === 'PAGADO' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                                color:      r.estado_pago === 'PAGADO' ? '#10B981' : '#F59E0B',
                               }}>
-                          {['Pendiente','En proceso','Completado','Entregado','Facturado'][r.estado] ?? '—'}
+                          {['Pendiente','En proceso','Finalizada','Entregada'][r.estado] ?? '—'}
                         </span>
                       </td>
                       <td>
                         {r.id_factura > 0 && (
-                          <Link to={`/invoice/${r.id_registro}`}
+                          <Link to={`/ordenes/${r.id_registro}`}
                                 className="text-gm-red text-xs font-bold hover:text-gm-red-lt whitespace-nowrap">
                             Ver →
                           </Link>

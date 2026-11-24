@@ -1,9 +1,9 @@
 /* ─────────────────────────────────────────────
-   GMotors — Referencia de mantenimiento (Ecuador)
+   OpenMotors — Referencia de mantenimiento (Ecuador)
    Espejo EXACTO de DatabaseSeeder.java del backend.
    Fuente de verdad para el panel explicativo de cálculos.
-   El estado real por moto SIEMPRE viene del backend
-   (alertasApi.estadoMoto), esto solo documenta la metodología.
+   El estado real por carro SIEMPRE viene del backend
+   (alertasApi.estadoCarro), esto solo documenta la metodología.
    ───────────────────────────────────────────── */
 
 export interface RangoCC {
@@ -54,7 +54,7 @@ export const TIPO_ICON: Record<string, string> = {
 
 /* ── Tabla completa de intervalos (km) por rango — espejo EXACTO del seeder ──
    Intervalos cortos a propósito (rodadura Ecuador: polvo, altitud, combustible
-   87-oct). Mantienen la moto óptima y disparan recordatorios al correo seguido. */
+   87-oct). Mantienen el carro óptima y disparan recordatorios al correo seguido. */
 export const INTERVALOS: { rango: RangoCC; params: ParametroRef[] }[] = [
   {
     rango: RANGOS_CC[0],

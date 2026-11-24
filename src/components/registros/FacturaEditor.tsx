@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Editor de factura de una orden
+   OpenMotors — Editor de factura de una orden
    Separa MANO DE OBRA y REPUESTOS (inventario o manual/externo).
    Calcula totales en vivo y guarda la lista completa de detalles.
    Se usa al completar una orden y para editar repuestos después
@@ -20,7 +20,7 @@ import {
 } from '../../lib/detalles';
 import { puntosPorDescuentoUsd } from '../../lib/puntos';
 import { tiposMantenimientoEnTexto } from '../../lib/mantenimiento';
-import type { Moto, RegistroDetalle, Producto, Usuario } from '../../types';
+import type { Carro, RegistroDetalle, Producto, Usuario } from '../../types';
 
 interface LineItem {
   uid:        string;
@@ -53,16 +53,15 @@ interface Props {
   productos: Producto[];
   usuarios?: Usuario[];
   registros?: RegistroDetalle[];
-  motos?: Moto[];
-  /** Si true, al guardar también marca la orden como Completada (estado 2). */
-  completarAlGuardar?: boolean;
+  carros?: Carro[];
+
   onClose: () => void;
   onSaved: (total: number, completo: boolean) => void;
 }
 
 export default function FacturaEditor({
   open, registro, productos,
-  completarAlGuardar = false, onClose, onSaved,
+  onClose, onSaved,
 }: Props) {
   const [theme] = useTheme();
   const isDark = theme === 'dark';
@@ -74,8 +73,8 @@ export default function FacturaEditor({
   const [prodOpen, setProdOpen] = useState(false);
   const [prodQuery, setProdQuery] = useState('');
 
-  /* Factura emitida (estado 4 = Facturado) → solo lectura: ya no se edita, solo se ven los detalles. */
-  const readOnly = (registro?.estado ?? 0) >= 4;
+  /* Los importes quedan bloqueados cuando hay pagos o la orden fue entregada. */
+  const readOnly = (registro?.monto_pagado ?? 0) > 0 || registro?.estado === 3;
 
   /* Cargar los detalles existentes al abrir */
   useEffect(() => {
@@ -205,10 +204,10 @@ export default function FacturaEditor({
       /* Auto-registro de mantenimiento al completar el trabajo.
          Lee inventario, repuestos manuales y la descripción original de la
          orden. La confirmación se espera para no cerrar con porcentajes viejos. */
-      const idMoto = registro.id_vehiculo;
+      const idCarro = registro.id_vehiculo;
       const km = registro.kilometraje;
-      const servicioQuedaCompletado = completarAlGuardar || registro.estado >= 2;
-      if (servicioQuedaCompletado && idMoto && km != null) {
+      const servicioQuedaCompletado = registro.estado >= 2;
+      if (servicioQuedaCompletado && idCarro && km != null) {
         const textoItems = items.map(item => {
           const prod = item.idProducto == null
             ? null
@@ -223,22 +222,12 @@ export default function FacturaEditor({
         ].filter(Boolean).join(' ');
         const tiposARegistrar = tiposMantenimientoEnTexto(textoServicio);
         await Promise.all(tiposARegistrar.map(tipo =>
-          mantenimientosApi.registrar({ id_vehiculo: idMoto, tipo, km_servicio: km })
+          mantenimientosApi.registrar({ id_vehiculo: idCarro, tipo, km_servicio: km })
         ));
       }
 
-      /* La orden solo cambia a Completada después de confirmar los
-         mantenimientos, para no dejar porcentajes viejos por una falla de red. */
-      if (completarAlGuardar && registro.estado < 2) {
-        await registrosApi.estado(registro.id_registro, 2);
-      }
-
-      toast.success(
-        completarAlGuardar
-          ? 'Servicio completado · factura con mano de obra y repuestos lista.'
-          : 'Factura actualizada · mano de obra y repuestos guardados.',
-      );
-      onSaved(total, !!completarAlGuardar);
+      toast.success('Comprobante actualizado');
+      onSaved(total, false);
     } catch (err) {
       toast.error(getErrorMsg(err));
     } finally {
@@ -364,7 +353,7 @@ export default function FacturaEditor({
     <Modal
       open={open}
       onClose={onClose}
-      title={readOnly ? 'Factura emitida · solo lectura' : completarAlGuardar ? 'Completar servicio · factura' : 'Mano de obra y repuestos'}
+      title={readOnly ? 'Comprobante · solo lectura' : 'Mano de obra y repuestos'}
       size="lg"
       footer={
         readOnly ? (
@@ -373,7 +362,7 @@ export default function FacturaEditor({
           <>
             <Button variant="secondary" onClick={onClose}>Cancelar</Button>
             <Button onClick={guardar} loading={saving} disabled={items.length === 0}>
-              <CheckCircle size={14} /> {completarAlGuardar ? 'Completar y facturar' : 'Guardar factura'}
+              <CheckCircle size={14} /> Guardar comprobante
             </Button>
           </>
         )
@@ -441,7 +430,7 @@ export default function FacturaEditor({
                 <input
                   autoFocus value={prodQuery} onChange={e => setProdQuery(e.target.value)}
                   placeholder="Buscar repuesto por nombre o código…"
-                  style={{ ...inputStyle, width: '100%', paddingLeft: 30 }}
+                  style={{ ...inputStyle, width: '100%', paddingLeft: 34, paddingRight: 30 }}
                 />
                 <button onClick={() => setProdOpen(false)} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: muted, display: 'flex' }}>
                   <X size={14} />

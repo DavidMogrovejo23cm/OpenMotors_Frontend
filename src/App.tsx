@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   OPEN MOTORS — Enrutador principal
+   OPENMOTORS — Enrutador principal
    React Router v7 + protección de rutas + guardas por rol
    ───────────────────────────────────────────── */
 
@@ -21,12 +21,15 @@ import PrivacidadPage from './pages/legal/PrivacidadPage';
 import TerminosPage   from './pages/legal/TerminosPage';
 
 /* App pages */
+import OrdenPage from './pages/taller/OrdenPage';
+import HerramientasPage from './pages/herramientas/HerramientasPage';
+import EscaneoPage from './pages/inventory/EscaneoPage';
 import DashboardPage       from './pages/dashboard/DashboardPage';
 import InventoryPage       from './pages/inventory/InventoryPage';
 import ProfilesPage        from './pages/profiles/ProfilesPage';
 import EmpleadoDetailPage  from './pages/profiles/EmpleadoDetailPage';
-import MotosPage           from './pages/motos/MotosPage';
-import MotoPerfilPage     from './pages/motos/MotoPerfilPage';
+import CarrosPage           from './pages/carros/CarrosPage';
+import CarroPerfilPage     from './pages/carros/CarroPerfilPage';
 import RecordsPage         from './pages/records/RecordsPage';
 import ClientesPage        from './pages/clientes/ClientesPage';
 
@@ -34,11 +37,12 @@ import ClientesPage        from './pages/clientes/ClientesPage';
 import AlertasPage       from './pages/alertas/AlertasPage';
 import InvoicePage       from './pages/invoice/InvoicePage';
 import PortalClientePage from './pages/portal/PortalClientePage';
-import MiMotoPage        from './pages/moto-cliente/MiMotoPage';
+import MiCarroPage        from './pages/carro-cliente/MiCarroPage';
 import DiagnosticoPage   from './pages/diagnostico/DiagnosticoPage';
 import PagosPage         from './pages/pagos/PagosPage';
 import ContabilidadPage  from './pages/contabilidad/ContabilidadPage';
 import ProveedoresPage   from './pages/proveedores/ProveedoresPage';
+import PersonalPage      from './pages/personal/PersonalPage';
 import AjustesPage       from './pages/settings/AjustesPage';
 
 /* ─── Guarda de roles ─────────────────────────────────────────────────────────
@@ -58,7 +62,7 @@ function RequireRole({ roles }: { roles: Array<'admin' | 'mecanico' | 'cliente'>
 function RequireModule({ modulo }: { modulo: string }) {
   const outletContext = useOutletContext();
   const { user, isAdmin, isMecanico } = useAuth();
-  return canAccessModulo(user?.descripcion, modulo, isAdmin, isMecanico)
+  return canAccessModulo(user?.permisos, modulo, isAdmin, isMecanico)
     ? <Outlet context={outletContext} />
     : <Navigate to="/dashboard" replace />;
 }
@@ -78,7 +82,7 @@ export default function App() {
           <Routes>
             {/* ── Rutas públicas ───────────────────────────────────────── */}
             <Route path="/login"           element={<LoginPage />}              />
-            <Route path="/registro"        element={<div className="gallery-public"><RegisterPage /></div>}           />
+            <Route path="/registro"        element={<RegisterPage />}           />
             <Route path="/recuperar"       element={<div className="gallery-public"><RecuperarPage /></div>}          />
             <Route path="/verificar-email" element={<div className="gallery-public"><EmailVerificationPage /></div>}  />
             <Route path="/privacidad"      element={<div className="gallery-public"><PrivacidadPage /></div>}         />
@@ -91,22 +95,26 @@ export default function App() {
                 {/* Accesibles para TODOS los roles autenticados */}
                 <Route path="/dashboard"   element={<DashboardPage />}    />
                 <Route path="/invoice/:id" element={<InvoicePage />}       />
+                <Route path="/ordenes/:id" element={<OrdenPage />} />
                 <Route path="/portal"      element={<PortalClientePage />} />
-                <Route path="/mi-moto"    element={<MiMotoPage />}        />
+                <Route path="/mi-carro"    element={<MiCarroPage />}        />
                 <Route path="/ajustes"     element={<AjustesPage />}       />
 
                 {/* Todos los autenticados: ver clientes */}
 
                 {/* Solo ADMIN + MECÁNICO */}
                 <Route element={<RequireRole roles={['admin', 'mecanico']} />}>
-                  <Route element={<RequireModule modulo="motos" />}>
-                    <Route path="/motos"       element={<MotosPage />}         />
-                    <Route path="/motos/:id"   element={<MotoPerfilPage />}    />
+                  <Route path="/herramientas" element={<HerramientasPage />} />
+                  <Route path="/personal" element={<PersonalPage />} />
+                  <Route element={<RequireModule modulo="carros" />}>
+                    <Route path="/carros"       element={<CarrosPage />}         />
+                    <Route path="/carros/:id"   element={<CarroPerfilPage />}    />
                   </Route>
                   <Route element={<RequireModule modulo="registros" />}>
                     <Route path="/registros"    element={<RecordsPage />}      />
                   </Route>
                   <Route element={<RequireModule modulo="inventario" />}>
+                    <Route path="/inventario/escaneo" element={<EscaneoPage />} />
                     <Route path="/inventario"   element={<InventoryPage />}    />
                   </Route>
                   <Route element={<RequireModule modulo="alertas" />}>

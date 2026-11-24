@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Firebase Auth
+   OpenMotors — Firebase Auth
    Popup con COOP same-origin-allow-popups (vercel.json)
    Config embebida como fallback para cualquier deploy
    ───────────────────────────────────────────── */

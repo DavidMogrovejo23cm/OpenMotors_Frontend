@@ -1,13 +1,13 @@
 /* ─────────────────────────────────────────────
-   GMotors — Fotos de motos (100% nube)
+   OpenMotors — Fotos de carros (100% nube)
    La foto se guarda en la BD (columna ruta_imagen_vehiculo, TEXT)
-   vía motosApi.update. Aquí solo se comprime y se decide qué mostrar.
+   vía carrosApi.update. Aquí solo se comprime y se decide qué mostrar.
    No se usa almacenamiento local (la app será un APK).
    ───────────────────────────────────────────── */
 
-/** Imagen a mostrar para una moto (la de la BD). */
-export function imagenMoto(moto: { ruta_imagen_vehiculo?: string | null }): string | null {
-  const r = moto.ruta_imagen_vehiculo;
+/** Imagen a mostrar para un carro (la de la BD). */
+export function imagenCarro(carro: { ruta_imagen_vehiculo?: string | null }): string | null {
+  const r = carro.ruta_imagen_vehiculo;
   if (r && r !== 'Desconocido' && r.trim() !== '') return r;
   return null;
 }

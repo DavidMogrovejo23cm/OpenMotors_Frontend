@@ -146,7 +146,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['SF Pro Text', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Lora', 'Georgia', 'Merriweather', 'Times New Roman', 'serif'],
+        serif: ['Lora', 'Georgia', 'Merriweather', 'Times New Roman', 'serif'],
       },
       boxShadow: {
         card:       '0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',

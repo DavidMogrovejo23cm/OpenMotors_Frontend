@@ -1,5 +1,6 @@
+import { cobrosDeOrdenes } from '../../lib/utils';
 /* ─────────────────────────────────────────────
-   Open Motors — Contabilidad del Negocio
+   OpenMotors — Contabilidad del Negocio
    Filtros: Día · Semana · Mes · Año · Todo
    ───────────────────────────────────────────── */
 
@@ -8,13 +9,14 @@ import XLSX from 'xlsx-js-style';
 import {
   TrendingUp, DollarSign, Wallet, Plus, Trash2,
   ArrowUpRight, ArrowDownRight, BarChart2, Receipt, Calendar,
-  Download, TrendingDown, Target, Activity,
+  Download, TrendingDown, Target, Activity, Printer,
 } from 'lucide-react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   CartesianGrid, ReferenceLine,
 } from 'recharts';
-import { registrosApi, pagosEmpleadoApi, usuariosApi, productosApi, detallesFacturaApi, facturasApi, proveedorContactosApi, type PagoEmpleadoAPI } from '../../lib/api';
+import { registrosApi, pagosEmpleadoApi, usuariosApi, productosApi, detallesFacturaApi, facturasApi, proveedorContactosApi, finanzasApi, type PagoEmpleadoAPI, type CategoriaMovimientoAPI } from '../../lib/api';
+import CajaPanel from '../../components/contabilidad/CajaPanel';
 import { useAuth } from '../../contexts/AuthContext';
 import { splitTotales, detalleCostoManual, detalleKind, type DetalleLike } from '../../lib/detalles';
 
@@ -272,10 +274,9 @@ function buildReportSheet(
     return p ? Number(p.costo ?? 0) : null;
   };
   const num = (v: unknown) => { const n = typeof v === 'string' ? parseFloat(v) : Number(v ?? 0); return isNaN(n) ? 0 : n; };
-  const montoIngreso = (r: RegistroDetalle) => totalCanonico(
-    detallesMap?.get(r.id_registro) ?? (r.detalles as DetalleFila[] | undefined),
-    r.costo_total
-  );
+  const montoIngreso = (r: RegistroDetalle) => mode === 'pendientes'
+    ? (r.saldo_pendiente ?? r.costo_total)
+    : (r.monto_pagado ?? r.costo_total);
 
   const totalIng = redondearDinero(ingresos.reduce((s, r) => s + montoIngreso(r), 0));
   const gasEmpl  = gastos.filter(g => g.id_empleado > 0).reduce((s, g) => s + Number(g.monto), 0);
@@ -289,8 +290,10 @@ function buildReportSheet(
     for (const r of ingresos) {
       const items = detallesMap.get(r.id_registro) ?? [];
       let rMano = 0, rInvRev = 0, rInvCost = 0, rExtra = 0, rExtraCost = 0, rDescuento = 0;
+      const totalItems = items.reduce((sum, d) => sum + num(d.subtotal), 0);
+      const factor = totalItems > 0 ? montoIngreso(r) / totalItems : 0;
       for (const d of items) {
-        const sub = num(d.subtotal);
+        const sub = num(d.subtotal) * factor;
         const idProd = d.idProducto ?? null;
         const kind = detalleKind(d);
         if (kind === 'mano') { rMano += sub; continue; }
@@ -298,10 +301,10 @@ function buildReportSheet(
         if (idProd != null) {
           const c = costoProducto(idProd);
           rInvRev += sub;
-          rInvCost += (c ?? 0) * (d.cantidad ?? 1);
+          rInvCost += (c ?? 0) * (d.cantidad ?? 1) * factor;
         } else {
           rExtra += sub;
-          rExtraCost += detalleCostoManual(d.descripcion) * (d.cantidad ?? 1);
+          rExtraCost += detalleCostoManual(d.descripcion) * (d.cantidad ?? 1) * factor;
         }
       }
       manoRev += rMano; repInvRev += rInvRev; repInvCost += rInvCost; piezaExtraRev += rExtra; piezaExtraCost += rExtraCost; descuentosRev += rDescuento;
@@ -336,7 +339,7 @@ function buildReportSheet(
   const R: RowMeta[] = [];
   const blank = () => R.push({ cells: [], kind: 'blank' });
 
-  R.push({ cells: ['Open Motors — Reporte Contable'], kind: 'title' });
+  R.push({ cells: ['OpenMotors — Reporte Contable'], kind: 'title' });
   R.push({ cells: [`Período: ${label}`], kind: 'subtitle' });
   R.push({ cells: [`Generado: ${hoy}`], kind: 'subtitle' });
   blank();
@@ -378,7 +381,7 @@ function buildReportSheet(
 
   if ((mode === 'all' || mode === 'inventario' || mode === 'ingresos') && detallesMap) {
     const productosVendidos: (string | number)[][] = [];
-    for (const r of ingresos) {
+    for (const r of ingresos.filter((r, i, all) => r.estado_pago === "PAGADO" && all.findIndex(x => x.id_registro === r.id_registro) === i)) {
       const items = detallesMap.get(r.id_registro) ?? [];
       for (const d of items) {
         const kind = detalleKind(d);
@@ -419,8 +422,8 @@ function buildReportSheet(
   if (mode === 'all' || mode === 'ingresos' || mode === 'pendientes' || mode === 'activas') {
     let bannerTitle = 'INGRESOS (COBRADOS)';
     let bStyle = XS.headerGreen;
-    if (mode === 'pendientes') { bannerTitle = 'MOTOS PENDIENTES DE PAGO / ENTREGA'; bStyle = XS.headerAmber; }
-    if (mode === 'activas') { bannerTitle = 'MOTOS ACTIVAS EN TALLER'; bStyle = XS.headerRed; }
+    if (mode === 'pendientes') { bannerTitle = 'CARROS PENDIENTES DE PAGO / ENTREGA'; bStyle = XS.headerAmber; }
+    if (mode === 'activas') { bannerTitle = 'CARROS ACTIVAS EN TALLER'; bStyle = XS.headerRed; }
 
     R.push({ cells: [bannerTitle], kind: 'banner', bannerStyle: bStyle });
     R.push({ cells: ['Fecha', 'Placa', 'Tipo de servicio', 'Estado', 'Monto (USD)'], kind: 'header', headerStyles: [XS.headerGray, XS.headerGray, XS.headerGray, XS.headerGray, XS.headerGreen] });
@@ -497,13 +500,14 @@ function exportarExcel(
   proveedores: Map<string, ProveedorContacto> = new Map(),
   filtroTipo: FiltroTipo = 'mes',
   filtroAnio: number = new Date().getFullYear(),
-  filtroFecha: string = ''
+  filtroFecha: string = '',
+  movimientosCobro: RegistroDetalle[] = cobrosDeOrdenes(ingresos)
 ) {
   const hoy = new Date().toISOString().slice(0, 10);
   const wb  = XLSX.utils.book_new();
 
-  const cobrados = ingresos.filter(r => r.estado === 4);
-  const pendientes = ingresos.filter(r => r.estado !== 4);
+  const cobrados = movimientosCobro;
+  const pendientes = ingresos.filter(r => (r.saldo_pendiente ?? r.costo_total) > 0);
   const activas = ingresos.filter(r => r.estado < 3);
 
   XLSX.utils.book_append_sheet(wb, buildReportSheet(cobrados, gastos, empleados, label, detallesMap, productos, 'resumen', proveedores), 'Resumen');
@@ -599,6 +603,9 @@ export default function ContabilidadPage() {
   const cierreActivoRef = useRef(false);
   const [modalGasto,    setModalGasto]    = useState(false);
   const [savingGasto,   setSavingGasto]   = useState(false);
+  const [vistaContab,   setVistaContab]   = useState<'finanzas' | 'caja'>('finanzas');
+  const [categoriasApi, setCategoriasApi] = useState<CategoriaMovimientoAPI[]>([]);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('TODAS');
 
   const hoy  = new Date();
   const anioActual = hoy.getFullYear();
@@ -622,14 +629,16 @@ export default function ContabilidadPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [rRes, gRes, uRes, pRes, fRes, provRes] = await Promise.all([
+      const [rRes, gRes, uRes, pRes, fRes, provRes, catRes] = await Promise.all([
         registrosApi.list(),
         pagosEmpleadoApi.listAll(),
         usuariosApi.list(),
         productosApi.list(),
         facturasApi.list(),
         proveedorContactosApi.list(),
+        finanzasApi.categorias('EGRESO').catch(() => ({ data: [] as CategoriaMovimientoAPI[] })),
       ]);
+      setCategoriasApi(Array.isArray(catRes.data) ? catRes.data : []);
       const allRegistros: RegistroDetalle[] = Array.isArray(rRes.data) ? rRes.data : [];
       const allFacturas: Factura[] = Array.isArray(fRes.data) ? fRes.data : [];
       const directas = allFacturas.filter(f => !allRegistros.some(r => r.id_factura === f.id_factura));
@@ -641,7 +650,7 @@ export default function ContabilidadPage() {
       );
       const registrosNormalizados = allRegistros.map(r => ({
         ...r,
-        costo_total: totalCanonico(r.detalles as DetalleFila[] | undefined, r.costo_total),
+        costo_total: r.costo_total,
       }));
       const facturasNormalizadas = allFacturas.map(f => ({
         ...f,
@@ -681,8 +690,8 @@ export default function ContabilidadPage() {
 
   /* ── KPIs ── */
   const ingresosPeriodo = useMemo(() => {
-    const cobrados = registros.filter(r => r.estado === 4);
-    const facturasDirectas = facturas.filter(f => !registros.some(r => r.id_factura === f.id_factura));
+    const cobrados = cobrosDeOrdenes(registros);
+    const facturasDirectas = facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura));
     
     const sumaRegistros = filtrar(cobrados.map(r => ({ ...r }))).reduce((s, r) => s + (r.costo_total ?? 0), 0);
     const sumaDirectas = filtrar(facturasDirectas.map(f => ({ ...f, fecha: f.fecha_emision || f.fecha }))).reduce((s, f) => s + (f.costo_total ?? 0), 0);
@@ -702,8 +711,8 @@ export default function ContabilidadPage() {
 
   /* ── Chart adaptable al filtro activo ── */
   const { chartIngresos, chartGastos, chartLabels } = useMemo(() => {
-    const cobrados = registros.filter(r => r.estado === 4);
-    const facturasDirectas = facturas.filter(f => !registros.some(r => r.id_factura === f.id_factura));
+    const cobrados = cobrosDeOrdenes(registros);
+    const facturasDirectas = facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura));
     
     const todosIngresos = [
       ...cobrados.map(r => ({ fecha: toIsoStr(r.fecha), costo_total: r.costo_total })),
@@ -770,7 +779,14 @@ export default function ContabilidadPage() {
     return u ? u.nombre_completo.split(' ').slice(0,2).join(' ') : `Empleado #${idEmp}`;
   };
 
-  const CONCEPTOS_EMPLEADO = ['Sueldo', 'Bono', 'Anticipo'];
+  const conceptosDisponibles = useMemo(
+    () => (categoriasApi.length ? categoriasApi.map(c => c.nombre) : CONCEPTOS_GASTO),
+    [categoriasApi],
+  );
+  const CONCEPTOS_EMPLEADO = useMemo(() => {
+    const emp = categoriasApi.filter(c => c.es_personal).map(c => c.nombre);
+    return emp.length ? emp : ['Sueldo', 'Bono', 'Comisión', 'Anticipo'];
+  }, [categoriasApi]);
 
   const handleGuardarGasto = async () => {
     const monto = parseFloat(form.monto);
@@ -780,10 +796,17 @@ export default function ContabilidadPage() {
     const idEmp = necesitaEmpleado ? form.empleadoId : 0;
     setSavingGasto(true);
     try {
-      await pagosEmpleadoApi.create({ id_empleado: idEmp, fecha: form.fecha, concepto: form.concepto, monto, notas: form.notas || undefined });
+      await pagosEmpleadoApi.create({
+        id_empleado: idEmp,
+        fecha: form.fecha,
+        concepto: form.concepto,
+        categoria: form.concepto,
+        monto,
+        notas: form.notas || undefined,
+      });
       toast.success('Gasto registrado');
       setModalGasto(false);
-      setForm({ concepto: 'Compra inventario', fecha: hoyStr, monto: '', notas: '', empleadoId: 0, empSearch: '' });
+      setForm({ concepto: conceptosDisponibles[0] ?? 'Compra inventario', fecha: hoyStr, monto: '', notas: '', empleadoId: 0, empSearch: '' });
       fetchData();
     } catch (err) { toast.error(getErrorMsg(err)); }
     finally { setSavingGasto(false); }
@@ -798,25 +821,28 @@ export default function ContabilidadPage() {
   };
 
   const movimientos = useMemo(() => {
-    const ing = filtrar(registros.filter(r => r.estado === 4))
-      .map(r => ({ tipo:'ingreso' as const, fecha:toIsoStr(r.fecha), desc:`Servicio · ${r.placa}`, monto:r.costo_total??0, id:r.id_registro }));
+    const ing = filtrar(cobrosDeOrdenes(registros))
+      .map(r => ({ tipo:'ingreso' as const, categoria: 'Servicio de taller', fecha:toIsoStr(r.fecha), desc:`Servicio · ${r.placa}`, monto:r.costo_total??0, id:r.id_registro }));
     
-    const facturasDirectas = filtrar(facturas.filter(f => !registros.some(r => r.id_factura === f.id_factura))
+    const facturasDirectas = filtrar(facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura))
       .map(f => ({ ...f, fecha: f.fecha_emision || f.fecha })));
     const ingDir = facturasDirectas.map(f => {
       const info = ventaDirectaInfo(f.id_factura, detallesDirectos.get(f.id_factura), productos, proveedores);
-      return { tipo:'ingreso' as const, fecha:toIsoStr(f.fecha_emision || f.fecha), desc:info.resumen, monto:f.costo_total??0, id: -f.id_factura };
+      return { tipo:'ingreso' as const, categoria: 'Venta mostrador', fecha:toIsoStr(f.fecha_emision || f.fecha), desc:info.resumen, monto:f.costo_total??0, id: -f.id_factura };
     });
     
     const gas = filtrar(gastos)
-      .map(g => ({ tipo:'gasto' as const, fecha:toIsoStr(g.fecha), desc:`${g.concepto} — ${nombreEmpleado(g.id_empleado)}`, monto:Number(g.monto), id:g.id_pago, id_pago:g.id_pago }));
-    return [...ing, ...ingDir, ...gas].sort((a,b) => b.fecha.localeCompare(a.fecha)).slice(0, 30);
+      .map(g => ({ tipo:'gasto' as const, categoria: g.categoria || g.concepto, fecha:toIsoStr(g.fecha), desc:`${g.concepto} — ${nombreEmpleado(g.id_empleado)}`, monto:Number(g.monto), id:g.id_pago, id_pago:g.id_pago }));
+    return [...ing, ...ingDir, ...gas]
+      .filter(m => categoriaFiltro === 'TODAS' || m.categoria === categoriaFiltro)
+      .sort((a,b) => b.fecha.localeCompare(a.fecha))
+      .slice(0, 40);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registros, facturas, gastos, empleados, productos, proveedores, detallesDirectos, filtrar]);
+  }, [registros, facturas, gastos, empleados, productos, proveedores, detallesDirectos, filtrar, categoriaFiltro]);
 
   /* ── KPIs de negocio ampliados ── */
   const serviciosPeriodo = useMemo(
-    () => filtrar(registros.filter(r => r.estado === 4)).length,
+    () => filtrar(cobrosDeOrdenes(registros)).length,
     [registros, filtrar]
   );
   const ticketPromedio   = serviciosPeriodo > 0 ? ingresosPeriodo / serviciosPeriodo : 0;
@@ -827,7 +853,7 @@ export default function ContabilidadPage() {
     if (filtroTipo !== 'mes') return null;
     let prevM = filtroMes - 1, prevY = filtroAnio;
     if (prevM === 0) { prevM = 12; prevY -= 1; }
-    const cobradosPrev = registros.filter(r => r.estado === 4 && (() => {
+    const cobradosPrev = cobrosDeOrdenes(registros).filter(r => (() => {
       const f = toIsoStr(r.fecha);
       return f.startsWith(`${prevY}-${String(prevM).padStart(2,'0')}`);
     })()).reduce((s, r) => s + (r.costo_total ?? 0), 0);
@@ -840,7 +866,7 @@ export default function ContabilidadPage() {
       label:'Ingresos', value:fmtMoney(ingresosPeriodo),
       sub: crecimientoMes != null
         ? `${crecimientoMes >= 0 ? '▲' : '▼'} ${Math.abs(crecimientoMes).toFixed(1)}% vs mes anterior`
-        : 'Servicios facturados',
+        : 'Cobros registrados',
       icon: crecimientoMes != null && crecimientoMes < 0 ? TrendingDown : TrendingUp,
       color:'#10B981', bg:'rgba(16,185,129,0.08)', border:'rgba(16,185,129,0.2)',
     },
@@ -851,7 +877,7 @@ export default function ContabilidadPage() {
       bg: balance >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(225,20,40,0.08)',
       border: balance >= 0 ? 'rgba(16,185,129,0.2)' : 'rgba(225,20,40,0.2)',
     },
-    { label:'Ticket promedio', value:fmtMoney(ticketPromedio),  sub:`${serviciosPeriodo} servicios facturados`, icon:Target, color:'#8B5CF6', bg:'rgba(139,92,246,0.08)', border:'rgba(139,92,246,0.2)' },
+    { label:'Ticket promedio', value:fmtMoney(ticketPromedio),  sub:`${serviciosPeriodo} cobros registrados`, icon:Target, color:'#8B5CF6', bg:'rgba(139,92,246,0.08)', border:'rgba(139,92,246,0.2)' },
   ];
 
   /* ── Calcular cierre de caja del período ── */
@@ -859,8 +885,8 @@ export default function ContabilidadPage() {
     cierreActivoRef.current = true;
     setCierreLoading(true);
     try {
-      const ordered = filtrar(registros.filter(r => r.estado === 4));
-      const facturasDirectas = filtrar(facturas.filter(f => !registros.some(r => r.id_factura === f.id_factura)).map(f => ({ ...f, fecha: f.fecha_emision || f.fecha })));
+      const ordered = filtrar(registros.filter(r => r.estado_pago === "PAGADO").map(r => ({ ...r, fecha: r.fecha_facturado ?? r.fecha })));
+      const facturasDirectas = filtrar(facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura)).map(f => ({ ...f, fecha: f.fecha_emision || f.fecha })));
       
       const results = await Promise.allSettled([
         ...ordered.map(r => registrosApi.detalles(r.id_factura).then(res => res.data as DetalleFila[])),
@@ -933,14 +959,49 @@ export default function ContabilidadPage() {
           <div>
             <p className="text-[10px] tracking-[0.3em] text-gm-red font-black uppercase mb-1">Taller · Finanzas</p>
             <h1 className="text-3xl font-black dark:text-white text-slate-900">Contabilidad</h1>
-            <p className="dark:text-white/30 text-slate-900/30 text-sm mt-1">Ingresos, gastos y balance del negocio</p>
+            <p className="dark:text-white/30 text-slate-900/30 text-sm mt-1">Ingresos, gastos, caja y balance del negocio</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setVistaContab('finanzas')}
+                className={`px-3 py-2 text-xs font-bold ${vistaContab === 'finanzas' ? 'bg-gm-red text-white' : 'opacity-65'}`}
+              >
+                Resumen financiero
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaContab('caja')}
+                className={`px-3 py-2 text-xs font-bold ${vistaContab === 'caja' ? 'bg-gm-red text-white' : 'opacity-65'}`}
+              >
+                Caja y efectivo
+              </button>
+            </div>
+            {vistaContab === 'finanzas' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const w = window.open('', '_blank', 'width=900,height=760');
+                    if (!w) { toast.error('Activa las ventanas emergentes para imprimir el reporte PDF'); return; }
+                    const labelPeriodo = filtroLabel(filtroTipo, filtroFecha, filtroMes, filtroAnio);
+                    const rowsHtml = movimientos.map(m =>
+                      `<tr><td>${fmtDate(m.fecha)}</td><td>${m.categoria}</td><td>${m.desc}</td><td style="text-align:right;font-weight:700;color:${m.tipo === 'ingreso' ? '#059669' : '#dc2626'}">${m.tipo === 'ingreso' ? '+' : '-'}${fmtMoney(m.monto)}</td></tr>`
+                    ).join('');
+                    w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Reporte Financiero OpenMotors — ${labelPeriodo}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#0f172a}h1{margin:0;font-size:22px}.sub{color:#64748b;margin:4px 0 18px}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}.kpi{padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc}.kpi small{display:block;color:#64748b;font-size:11px;text-transform:uppercase}.kpi b{font-size:18px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9;font-size:11px;text-transform:uppercase}</style></head><body><h1>OpenMotors — Reporte Financiero</h1><p class="sub">Período: ${labelPeriodo} · Emitido: ${fmtDate(hoyStr)}</p><div class="kpis"><div class="kpi"><small>Ingresos totales</small><b>${fmtMoney(ingresosPeriodo)}</b></div><div class="kpi"><small>Gastos totales</small><b>${fmtMoney(totalGastos)}</b></div><div class="kpi"><small>Balance neto</small><b>${fmtMoney(balance)}</b></div></div><table><thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th style="text-align:right">Monto</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="4">Sin movimientos en el período</td></tr>'}</tbody></table></body></html>`);
+                    w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+                  }}
+                  className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 hover:opacity-85"
+                  title="Generar vista imprimible / PDF del reporte financiero"
+                >
+                  <Printer size={13} /> Imprimir / PDF
+                </button>
+                <button
               disabled={exportLoading}
               onClick={async () => {
-                const ordered = filtrar(registros.filter(r => r.estado === 4));
-                const facturasDirectas = filtrar(facturas.filter(f => !registros.some(r => r.id_factura === f.id_factura)).map(f => ({ ...f, fecha: f.fecha_emision || f.fecha })));
+                const ordered = filtrar(cobrosDeOrdenes(registros));
+                const facturasDirectas = filtrar(facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura)).map(f => ({ ...f, fecha: f.fecha_emision || f.fecha })));
                 setExportLoading(true);
                 let detallesMap: Map<number, DetalleFila[]> | undefined;
                 try {
@@ -965,7 +1026,9 @@ export default function ContabilidadPage() {
                     id_encargado: 0,
                     id_factura: f.id_factura,
                     fecha: f.fecha,
-                    estado: 4,
+                    estado: 3,
+                    estado_pago: 'PAGADO' as const,
+                    monto_pagado: f.costo_total,
                     tipo: 0,
                     observaciones: info.detalle,
                     kilometraje: 0,
@@ -974,7 +1037,7 @@ export default function ContabilidadPage() {
                     placa: 'Venta directa',
                     tipo_servicio: info.detalle
                     ,nombre_cliente: f.cliente_nombre || 'Consumidor final'
-                    ,marca_vehiculo: 'Open Motors'
+                    ,marca_vehiculo: 'OpenMotors'
                     ,modelo_vehiculo: 'Inventario'
                     ,ruta_imagen_vehiculo: null
                     ,descripcion: info.detalle
@@ -983,7 +1046,7 @@ export default function ContabilidadPage() {
 
                 exportarExcel([...filtrar(registros), ...mockRegistros], filtrar(gastos), empleados,
                   filtroLabel(filtroTipo, filtroFecha, filtroMes, filtroAnio), detallesMap, productos, proveedores,
-                  filtroTipo, filtroAnio, filtroFecha);
+                  filtroTipo, filtroAnio, filtroFecha, [...filtrar(cobrosDeOrdenes(registros)), ...mockRegistros]);
                 setExportLoading(false);
               }}
               className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl transition-all"
@@ -997,10 +1060,12 @@ export default function ContabilidadPage() {
             <Button icon={<Plus size={14}/>} onClick={() => setModalGasto(true)}>
               Registrar gasto
             </Button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Filtros de fecha */}
+        {vistaContab === 'finanzas' && (
         <div className="flex flex-wrap items-center gap-3">
           {/* Tabs de tipo */}
           <div className="flex rounded-xl overflow-hidden shrink-0"
@@ -1090,7 +1155,11 @@ export default function ContabilidadPage() {
             {filtroLabel(filtroTipo, filtroFecha, filtroMes, filtroAnio)}
           </span>
         </div>
+        )}
       </div>
+
+      {vistaContab === 'caja' ? <CajaPanel /> : (
+        <>
 
       {/* ─── KPI cards ─── */}
       {loading ? (
@@ -1150,8 +1219,8 @@ export default function ContabilidadPage() {
         <button
           disabled={desgloseLoading}
           onClick={async () => {
-            const ordered = filtrar(registros.filter(r => r.estado === 4));
-            const facturasDirectas = filtrar(facturas.filter(f => !registros.some(r => r.id_factura === f.id_factura)).map(f => ({ ...f, fecha: f.fecha_emision || f.fecha })));
+            const ordered = filtrar(registros.filter(r => r.estado_pago === "PAGADO").map(r => ({ ...r, fecha: r.fecha_facturado ?? r.fecha })));
+            const facturasDirectas = filtrar(facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura)).map(f => ({ ...f, fecha: f.fecha_emision || f.fecha })));
             setDesgloseLoading(true);
             try {
               const results = await Promise.allSettled([
@@ -1393,9 +1462,22 @@ export default function ContabilidadPage() {
 
       {/* ─── Tabla de movimientos ─── */}
       <div className="section-enter gm-card-d rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-white/[0.06] flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-bold dark:text-white/80 text-slate-900/80">Movimientos</p>
-          <span className="text-[10px] dark:text-white/25 text-slate-900/25 font-semibold">{movimientos.length} registros</span>
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Filtrar movimientos por categoría"
+              className="gm-select-d text-xs"
+              value={categoriaFiltro}
+              onChange={e => setCategoriaFiltro(e.target.value)}
+            >
+              <option value="TODAS">Todas las categorías</option>
+              <option value="Servicio de taller">Servicio de taller</option>
+              <option value="Venta mostrador">Venta mostrador</option>
+              {conceptosDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <span className="text-[10px] dark:text-white/25 text-slate-900/25 font-semibold">{movimientos.length} registros</span>
+          </div>
         </div>
         <div className="overflow-x-auto dark-scroll">
           <table className="gm-table-d">
@@ -1466,10 +1548,10 @@ export default function ContabilidadPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">Concepto</label>
+            <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">Categoría / Concepto</label>
             <select className="gm-select-d w-full" value={form.concepto}
               onChange={e => setForm(f => ({ ...f, concepto: e.target.value, empleadoId: 0, empSearch: '' }))}>
-              {CONCEPTOS_GASTO.map(c => <option key={c} value={c}>{c}</option>)}
+              {conceptosDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
@@ -1538,6 +1620,8 @@ export default function ContabilidadPage() {
           </div>
         </div>
       </Modal>
+        </>
+        )}
     </div>
   );
 }

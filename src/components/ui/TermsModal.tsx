@@ -17,7 +17,7 @@ const PUNTOS = [
   'Tus datos (clientes, vehículos, órdenes) son privados y solo visibles para el personal autorizado.',
   'La información de facturación se conserva según normativa SRI Ecuador.',
   'Puedes solicitar la eliminación de tu cuenta y datos en cualquier momento.',
-  'El servicio se presta bajo los Términos de Uso de Open Motors.',
+  'El servicio se presta bajo los Términos de Uso de OpenMotors.',
 ];
 
 interface Props {
@@ -89,7 +89,7 @@ export default function TermsModal({ onAccept }: Props) {
           </h2>
           <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, margin: '0 0 22px', lineHeight: 1.6 }}>
             Antes de continuar, por favor revisa y acepta los términos de uso de{' '}
-            <span style={{ color: '#fff', fontWeight: 700 }}>Open Motors</span>.
+            <span style={{ color: '#fff', fontWeight: 700 }}>OpenMotors</span>.
           </p>
 
           {/* Puntos clave */}
@@ -164,7 +164,7 @@ export default function TermsModal({ onAccept }: Props) {
 
           {/* Nota inferior */}
           <p style={{ textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.18)', marginTop: 14 }}>
-            Solo se muestra una vez · Open Motors © 2025 · Ecuador
+            Solo se muestra una vez · OpenMotors © 2025 · Ecuador
           </p>
         </div>
       </div>

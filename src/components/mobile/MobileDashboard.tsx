@@ -1,5 +1,6 @@
+import { cobrosDeOrdenes, ORDEN_LABELS, ORDEN_COLORS } from '../../lib/utils';
 /* ─────────────────────────────────────────────
-   GMotors — Dashboard MÓVIL (solo APK)
+   OpenMotors — Dashboard MÓVIL (solo APK)
    Estilo premium tipo app nativa. Usa los datos reales del taller.
    La versión web (DashboardPage) queda intacta.
    ───────────────────────────────────────────── */
@@ -8,16 +9,14 @@ import { Link } from 'react-router-dom';
 import { Wrench, Package, Car, Users, Activity, AlertTriangle, ChevronRight, TrendingUp, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
-import { motosApi, registrosApi, productosApi, usuariosApi, facturasApi } from '../../lib/api';
+import { carrosApi, registrosApi, productosApi, usuariosApi, facturasApi } from '../../lib/api';
 import { fmtMoney, fmtDate, toIsoStr } from '../../lib/utils';
 import { usePolling } from '../../hooks/usePolling';
 import { useTheme } from '../../lib/theme';
-import type { Factura, RegistroDetalle, Moto, Producto } from '../../types';
+import type { Factura, RegistroDetalle, Carro, Producto } from '../../types';
 
-const ESTADO_COLORS: Record<number, string> = {
-  0: '#F59E0B', 1: '#3B82F6', 2: '#10B981', 3: '#8B5CF6', 4: '#14B8A6',
-};
-const ESTADO_LABELS = ['Pendiente', 'En proceso', 'Completado', 'Entregado', 'Facturado'];
+const ESTADO_COLORS = ORDEN_COLORS;
+const ESTADO_LABELS = ORDEN_LABELS;
 
 /* Tarjeta KPI premium */
 function Kpi({ icon: Icon, value, label, color, to }: {
@@ -93,7 +92,7 @@ function ActivityChart({ areaData }: {
 export default function MobileDashboard() {
   const { user, isAdmin, isMecanico } = useAuth();
 
-  const [motos,     setMotos]     = useState<Moto[]>([]);
+  const [carros,     setCarros]     = useState<Carro[]>([]);
   const [registros, setRegistros] = useState<RegistroDetalle[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [usuarios,  setUsuarios]  = useState<unknown[]>([]);
@@ -107,14 +106,14 @@ export default function MobileDashboard() {
 
   const load = useCallback(async () => {
     const promises = [
-      motosApi.list(),
+      carrosApi.list(),
       registrosApi.list(),
       productosApi.list(),
       isAdmin ? usuariosApi.list() : Promise.resolve({ data: [] }),
       isAdmin ? facturasApi.list() : Promise.resolve({ data: [] })
     ];
     const [m, r, p, u, f] = await Promise.allSettled(promises);
-    if (m.status === 'fulfilled') setMotos(m.value.data);
+    if (m.status === 'fulfilled') setCarros(m.value.data);
     if (r.status === 'fulfilled') setRegistros(r.value.data);
     if (p.status === 'fulfilled') setProductos(p.value.data);
     if (u.status === 'fulfilled') setUsuarios(u.value.data);
@@ -125,8 +124,8 @@ export default function MobileDashboard() {
   usePolling(load, { intervalMs: 25_000 });
 
   const ingresosTotal = useMemo(() =>
-    facturas.reduce((s, f) => s + (f.costo_total ?? 0), 0)
-  , [facturas]);
+    cobrosDeOrdenes(registros).reduce((s, r) => s + r.costo_total, 0) + facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura)).reduce((s, f) => s + (f.costo_total ?? 0), 0)
+  , [registros, facturas]);
   const stockCritico  = useMemo(() => productos.filter(p => p.stock <= 3).length, [productos]);
   const activas       = useMemo(() => registros.filter(r => r.estado < 3).length, [registros]);
 
@@ -137,11 +136,11 @@ export default function MobileDashboard() {
     });
     return days.map(day => {
       const dr = registros.filter(r => toIsoStr(r.fecha).startsWith(day));
-      const df = facturas.filter(f => toIsoStr(f.fecha_emision || f.fecha).startsWith(day));
-      return { 
-        day: day.slice(5), 
-        ordenes: dr.length, 
-        ingresos: df.reduce((s, f) => s + (f.costo_total ?? 0), 0) 
+      const df = facturas.filter(f => f.origen_venta === 'INVENTARIO' && !registros.some(r => r.id_factura === f.id_factura) && toIsoStr(f.fecha_emision || f.fecha).startsWith(day));
+      return {
+        day: day.slice(5),
+        ordenes: dr.length,
+        ingresos: cobrosDeOrdenes(registros).filter(r => toIsoStr(r.fecha).startsWith(day)).reduce((s, r) => s + r.costo_total, 0) + df.reduce((s, f) => s + (f.costo_total ?? 0), 0)
       };
     });
   }, [registros, facturas]);
@@ -161,8 +160,8 @@ export default function MobileDashboard() {
 
   /* ════════ Vista CLIENTE (cualquier usuario que NO sea admin ni mecánico) ════════ */
   if (!isAdmin && !isMecanico) {
-    const myMotos  = motos.filter(m => m.id_usuario === user?.id_usuario);
-    const myPlacas = new Set(myMotos.map(m => m.placa));
+    const myCarros  = carros.filter(m => m.id_usuario === user?.id_usuario);
+    const myPlacas = new Set(myCarros.map(m => m.placa));
     const myRegs   = registros.filter(r => myPlacas.has(r.placa));
     const myPuntos = myRegs.length * 8;
     return (
@@ -172,7 +171,7 @@ export default function MobileDashboard() {
           <h1 className="m-hero-name">{firstName}</h1>
           <div className="grid grid-cols-3 gap-2 mt-4 bg-white/5 rounded-xl p-3 border border-white/10 dark:bg-black/10">
             <div className="flex flex-col items-center justify-center">
-              <p className="m-hs-num">{myMotos.length}</p>
+              <p className="m-hs-num">{myCarros.length}</p>
               <p className="m-hs-lbl">Vehículos</p>
             </div>
             <div className="flex flex-col items-center justify-center border-x border-white/10">
@@ -189,7 +188,7 @@ export default function MobileDashboard() {
         <div className="m-section-t mt-4">Accesos Rápidos</div>
         <div className="m-mods">
           {[
-            { label: 'Mis vehículos',     desc: 'Estado y mantenimiento', to: '/mi-moto',     color: '#3B82F6', icon: Car  },
+            { label: 'Mis vehículos',     desc: 'Estado y mantenimiento', to: '/mi-carro',     color: '#3B82F6', icon: Car  },
           ].map(({ label, desc, to, color, icon: Icon }) => (
             <Link key={to} to={to} className="m-mod gm-card-d hover:-translate-y-1 transition-transform">
               <div className="m-mod-ico" style={{ background: `${color}1c`, border: `1px solid ${color}33` }}>
@@ -239,7 +238,7 @@ export default function MobileDashboard() {
 
       {/* KPIs */}
       <div className="m-kpi-grid">
-        <Kpi icon={Car}    value={motos.length}  label="Vehículos"          color="#3B82F6" to="/motos" />
+        <Kpi icon={Car}    value={carros.length}  label="Vehículos"          color="#3B82F6" to="/carros" />
         <Kpi icon={Wrench}  value={activas}        label="Órdenes activas" color="#E11428" to="/registros" />
         <Kpi icon={Package} value={stockCritico}  label="Stock crítico"  color="#F59E0B" to="/inventario" />
         {isAdmin

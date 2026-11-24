@@ -1,8 +1,9 @@
 /* ─────────────────────────────────────────────
-   GMotors — Tipos globales de TypeScript
+   OpenMotors — Tipos globales de TypeScript
    ───────────────────────────────────────────── */
 
 export interface Usuario {
+  permisos?:       string[];
   id_usuario:      number;
   nombre_completo: string;
   nombre_usuario:  string;
@@ -17,6 +18,7 @@ export interface Usuario {
   direccion?:      string | null;
   puntosBonus?:    number | null;
   codigoReferido?: string | null;
+  activo?:         boolean;
 }
 
 export interface AuthResponse {
@@ -38,7 +40,7 @@ export interface UsuarioRol {
   rol?:               { id_rol: number; nombre: string };
 }
 
-export interface Moto {
+export interface Carro {
   id_vehiculo:           number;
   placa:             string;
   anio:              number;
@@ -59,6 +61,10 @@ export interface Categoria {
 }
 
 export interface Producto {
+  codigo_barras?: string;
+  stock_minimo?: number;
+  stock_reservado?: number;
+  stock_disponible?: number;
   id_producto:         number;
   codigo_proveedor:    string;
   codigo_distribuidor?: string | null;
@@ -114,7 +120,7 @@ export interface Registro {
   id_registro:  number;
   fecha:        string;
   observaciones:string;
-  estado:       number;   // 0 pendiente, 1 en proceso, 2 completado, 3 entregado, 4 facturado
+  estado:       number;   // 0 pendiente, 1 en proceso, 2 finalizada, 3 entregada
   id_factura:   number;
   id_encargado: number;
   id_cliente:   number;
@@ -140,6 +146,7 @@ export interface RegistroDetalle {
   ruta_imagen_vehiculo: string | null;
   fecha:            string;
   fecha_entrega_estimada?: string | null;
+  horas_estimadas?: number | null;
   fecha_completado?: string | null;
   fecha_entregado?: string | null;
   fecha_facturado?: string | null;
@@ -148,6 +155,13 @@ export interface RegistroDetalle {
   costo_total:      number;
   id_factura:       number;
   estado:           number;
+  estado_pago?: 'PENDIENTE' | 'PARCIAL' | 'PAGADO';
+  monto_pagado?: number;
+  saldo_pendiente?: number;
+  revision_estado?: boolean;
+  flujo_integrado?: boolean;
+  estado_legacy?: number | null;
+  pagos?: { id_pago: number; monto: number; fecha: string; metodo: string }[];
   kilometraje:      number | null;
   observaciones?:   string | null;
   detalles?:        DetalleFactura[];
@@ -196,8 +210,8 @@ export interface CargaCombustible {
 }
 
 /* ─── Alertas Mantenimiento ─── */
-export interface MotoAlerta {
-  moto:             Moto;
+export interface CarroAlerta {
+  carro:             Carro;
   ownerName:        string;
   lastOilKm:        number | null;
   lastOilDate:      string | null;
@@ -216,7 +230,13 @@ export interface DetalleDiagnostico {
   observacion?: string | null;
 }
 
-export interface DiagnosticoMoto {
+export interface DiagnosticoCarro {
+  id_registro?: number | null;
+  id_recepcion?: number | null;
+  origen_diagnostico?: string;
+  escaner_utilizado?: string | null;
+  codigos_dtc?: string | null;
+  descripcion_escaner?: string | null;
   id_diagnostico?:         number;
   id_vehiculo:                 number;
   id_mecanico:             number;

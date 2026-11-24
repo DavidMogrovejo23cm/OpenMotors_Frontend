@@ -155,7 +155,7 @@ export default function RecuperarPage() {
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 10, color: 'rgba(24,27,35,0.12)', marginTop: 20 }}>
-          © 2025 Open Motors · Ecuador ·{' '}
+          © 2025 OpenMotors · Ecuador ·{' '}
           <Link to="/privacidad" style={{ color: 'rgba(24,27,35,0.2)', textDecoration: 'none' }}>Privacidad</Link>
         </p>
       </div>

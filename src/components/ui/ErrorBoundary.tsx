@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Error Boundary
+   OpenMotors — Error Boundary
    Evita la "pantalla blanca / app congelada": si cualquier
    componente lanza un error en render, se muestra una tarjeta
    de recuperación (en vez de desmontar todo el árbol de React).
@@ -28,7 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Log para diagnóstico (visible en la consola del navegador)
-    console.error('[GMotors] Error capturado por ErrorBoundary:', error, info.componentStack);
+    console.error('[OpenMotors] Error capturado por ErrorBoundary:', error, info.componentStack);
   }
 
   componentDidUpdate(prev: Props) {

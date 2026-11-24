@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Perfil de Moto
+   OpenMotors — Perfil de Carro
    Historial de diagnósticos + info completa
    ───────────────────────────────────────────── */
 
@@ -11,19 +11,19 @@ import {
   XCircle, ChevronDown, ChevronUp, Cog, Link2, Shield,
   Circle, ArrowUpDown, Droplets, Zap, Activity, type LucideIcon,
 } from 'lucide-react';
-import { motosApi, diagnosticosApi, usuariosApi, registrosApi } from '../../lib/api';
+import { carrosApi, diagnosticosApi, usuariosApi, registrosApi } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePolling } from '../../hooks/usePolling';
 import { nivelDiagnostico, fmtMoney, fmtDate, toIsoStr, ESTADO_REGISTRO } from '../../lib/utils';
-import type { Moto, Usuario, DiagnosticoMoto, RegistroDetalle } from '../../types';
-import { EstadoMotoLive } from '../../components/mantenimiento/EstadoMantenimiento';
-import { imagenMoto } from '../../lib/fotos';
+import type { Carro, Usuario, DiagnosticoCarro, RegistroDetalle } from '../../types';
+import { EstadoCarroLive } from '../../components/mantenimiento/EstadoMantenimiento';
+import { imagenCarro } from '../../lib/fotos';
 import { useTheme } from '../../lib/theme';
 
 /* ── Constantes ── */
 const TIPO_COLOR: Record<string, string> = {
-  Sport: '#FF3B47', Naked: '#FF8C00', Touring: '#00C9FF', Enduro: '#00E676',
-  Scrambler: '#D4A017', Cruiser: '#BF5FFF', Scooter: '#29D9C2', Otro: '#8A8A9E',
+  'Sedán': '#3B82F6', Hatchback: '#FF8C00', SUV: '#00E676', Pickup: '#F59E0B',
+  'Coupé': '#FF3B47', Van: '#00C9FF', Otro: '#8A8A9E',
 };
 const getTipoColor = (t: string) => TIPO_COLOR[t] ?? '#8A8A9E';
 
@@ -43,7 +43,7 @@ const ESTADO_CFG = {
 } as const;
 
 /* ── Sub-componente: card de un diagnóstico ── */
-function DiagCard({ d, usuarios }: { d: DiagnosticoMoto; usuarios: Usuario[] }) {
+function DiagCard({ d, usuarios }: { d: DiagnosticoCarro; usuarios: Usuario[] }) {
   const [open, setOpen] = useState(false);
   const [theme] = useTheme();
   const isDark = theme === 'dark';
@@ -124,18 +124,18 @@ function DiagCard({ d, usuarios }: { d: DiagnosticoMoto; usuarios: Usuario[] }) 
 }
 
 /* ══════════════════════════════════════════════════════════════ */
-export default function MotoPerfilPage() {
+export default function CarroPerfilPage() {
   const { id }                     = useParams<{ id: string }>();
   const navigate                   = useNavigate();
   const [theme]                    = useTheme();
   const isDark                     = theme === 'dark';
   const { isAdmin, isMecanico, isCliente, user: me } = useAuth();
-  const canManage                  = isAdmin || isMecanico;
+  const canManage                  = isAdmin || (isMecanico && (me?.permisos?.includes("recepcion") ?? false));
 
-  const [moto,     setMoto]     = useState<Moto | null>(null);
+  const [carro,     setCarro]     = useState<Carro | null>(null);
   const [owner,    setOwner]    = useState<Usuario | null>(null);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [historial,setHistorial]= useState<DiagnosticoMoto[]>([]);
+  const [historial,setHistorial]= useState<DiagnosticoCarro[]>([]);
   const [servicios,setServicios]= useState<RegistroDetalle[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [loadDx,   setLoadDx]   = useState(true);
@@ -143,31 +143,31 @@ export default function MotoPerfilPage() {
 
   useEffect(() => {
     if (!id) return;
-    const motoId = parseInt(id);
+    const carroId = parseInt(id);
 
     Promise.allSettled([
-      motosApi.get(motoId),
+      carrosApi.get(carroId),
       usuariosApi.list(),
     ]).then(([m, u]) => {
       if (m.status === 'rejected') { setError('Vehículo no encontrado'); setLoading(false); return; }
-      const motoData = m.value.data as Moto;
-      setMoto(motoData);
+      const carroData = m.value.data as Carro;
+      setCarro(carroData);
 
-      /* Cliente: solo puede ver sus propias motos */
-      if (isCliente && !canManage && me && motoData.id_usuario !== me.id_usuario) {
+      /* Cliente: solo puede ver sus propios carros */
+      if (isCliente && !isMecanico && !canManage && me && carroData.id_usuario !== me.id_usuario) {
         setError('No tienes acceso a este perfil'); setLoading(false); return;
       }
 
       if (u.status === 'fulfilled') {
         const usrs = u.value.data as Usuario[];
         setUsuarios(usrs);
-        setOwner(usrs.find(usr => usr.id_usuario === motoData.id_usuario) ?? null);
+        setOwner(usrs.find(usr => usr.id_usuario === carroData.id_usuario) ?? null);
       }
       setLoading(false);
     });
 
-    diagnosticosApi.byMoto(motoId)
-      .then(({ data }) => setHistorial((data as DiagnosticoMoto[]).sort((a, b) => {
+    diagnosticosApi.byCarro(carroId)
+      .then(({ data }) => setHistorial((data as DiagnosticoCarro[]).sort((a, b) => {
         return new Date(b.fecha ?? 0).getTime() - new Date(a.fecha ?? 0).getTime();
       })))
       .catch(() => setHistorial([]))
@@ -175,16 +175,16 @@ export default function MotoPerfilPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  /* Historial de servicios (órdenes) de esta moto — por placa */
+  /* Historial de servicios (órdenes) de este carro — por placa */
   const cargarServicios = useCallback(async () => {
-    if (!moto?.placa) return;
+    if (!carro?.placa) return;
     try {
       const { data } = await registrosApi.list();
       setServicios((data as RegistroDetalle[])
-        .filter(r => r.placa === moto.placa)
+        .filter(r => r.placa === carro.placa)
         .sort((a, b) => toIsoStr(b.fecha).localeCompare(toIsoStr(a.fecha))));
     } catch { /* silencioso */ }
-  }, [moto?.placa]);
+  }, [carro?.placa]);
 
   useEffect(() => { cargarServicios(); }, [cargarServicios]);
 
@@ -202,20 +202,20 @@ export default function MotoPerfilPage() {
   }
 
   /* ── Error ── */
-  if (error || !moto) {
+  if (error || !carro) {
     return (
       <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center', padding: '60px 20px' }}>
         <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.6)', fontSize: 15 }}>{error || 'Vehículo no encontrado'}</p>
-        <button onClick={() => navigate('/motos')} style={{ marginTop: 18, fontSize: 13, color: '#3B82F6', background: 'none', border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => navigate('/carros')} style={{ marginTop: 18, fontSize: 13, color: '#3B82F6', background: 'none', border: 'none', cursor: 'pointer' }}>
           Volver a vehículos
         </button>
       </div>
     );
   }
 
-  const tc       = getTipoColor(moto.tipo_vehiculo);
+  const tc       = getTipoColor(carro.tipo_vehiculo);
   const anioActual = new Date().getFullYear();
-  const antiguedad = anioActual - moto.anio;
+  const antiguedad = anioActual - carro.anio;
 
   const s: React.CSSProperties = {
     background: isDark ? '#111117' : '#FFFFFF', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : '#E4E7EC'}`, borderRadius: 16, padding: '20px 24px',
@@ -233,7 +233,7 @@ export default function MotoPerfilPage() {
 
       {/* ── Back ── */}
       <button
-        onClick={() => navigate('/motos')}
+        onClick={() => navigate('/carros')}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.6)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 22, padding: 0 }}
         onMouseEnter={e => (e.currentTarget.style.color = isDark ? '#EBEBEB' : '#15151B')}
         onMouseLeave={e => (e.currentTarget.style.color = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(21,21,27,0.6)')}
@@ -244,11 +244,11 @@ export default function MotoPerfilPage() {
       {/* ── Hero: foto + info principal ── */}
       <div style={{ ...s, marginBottom: 16, padding: 0, overflow: 'hidden' }}>
         {/* Foto o placeholder */}
-        {imagenMoto(moto) ? (
+        {imagenCarro(carro) ? (
           <div style={{ width: '100%', height: 200, overflow: 'hidden', position: 'relative' }}>
             <img
-              src={imagenMoto(moto)!}
-              alt={`${moto.marca} ${moto.modelo}`}
+              src={imagenCarro(carro)!}
+              alt={`${carro.marca} ${carro.modelo}`}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
             <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to bottom, transparent 50%, ${isDark ? '#111117' : '#FFFFFF'} 100%)` }} />
@@ -266,21 +266,21 @@ export default function MotoPerfilPage() {
               {/* Tipo badge */}
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: tc, background: `${tc}15`, border: `1px solid ${tc}30`, borderRadius: 99, padding: '3px 10px', marginBottom: 10 }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: tc, flexShrink: 0 }} />
-                {moto.tipo_vehiculo}
+                {carro.tipo_vehiculo}
               </div>
 
               {/* Placa + nombre */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', color: cs, background: cbg, border: `1px solid ${cbd}`, borderRadius: 6, padding: '2px 8px' }}>
-                  {moto.placa}
+                  {carro.placa}
                 </span>
               </div>
               <h1 style={{ color: ct, fontWeight: 800, fontSize: 24, margin: '0 0 2px', letterSpacing: '-0.03em' }}>
-                {moto.marca} <span style={{ color: cm }}>{moto.modelo}</span>
+                {carro.marca} <span style={{ color: cm }}>{carro.modelo}</span>
               </h1>
-              {moto.nombre_vehiculo && (
+              {carro.nombre_vehiculo && (
                 <p style={{ color: cs, fontSize: 13, margin: 0 }}>
-                  "{moto.nombre_vehiculo}"
+                  "{carro.nombre_vehiculo}"
                 </p>
               )}
             </div>
@@ -289,7 +289,7 @@ export default function MotoPerfilPage() {
             {canManage && (
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 <Link
-                  to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
+                  to={`/diagnostico?carro_id=${carro.id_vehiculo}`}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#fff', background: '#3B82F6', border: 'none', borderRadius: 9, padding: '8px 16px', textDecoration: 'none', cursor: 'pointer' }}
                 >
                   <Plus size={13} /> Diagnóstico
@@ -301,8 +301,8 @@ export default function MotoPerfilPage() {
           {/* Stats */}
           <div style={{ display: 'flex', gap: 0, marginTop: 18, background: cbg, border: `1px solid ${cbd}`, borderRadius: 12, overflow: 'hidden' }}>
             {[
-              { icon: <Zap size={13} />,      val: moto.kilometraje.toLocaleString('es-CO'), lbl: 'Kilómetros' },
-              { icon: <Calendar size={13} />, val: moto.anio, lbl: antiguedad === 0 ? 'Nuevo' : `${antiguedad} años` },
+              { icon: <Zap size={13} />,      val: carro.kilometraje.toLocaleString('es-CO'), lbl: 'Kilómetros' },
+              { icon: <Calendar size={13} />, val: carro.anio, lbl: antiguedad === 0 ? 'Nuevo' : `${antiguedad} años` },
             ].map((st, i) => (
               <div key={i} style={{ flex: 1, padding: '14px 0', textAlign: 'center', borderRight: i < 2 ? `1px solid ${cbd}` : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', color: cm, marginBottom: 4 }}>{st.icon}</div>
@@ -345,11 +345,11 @@ export default function MotoPerfilPage() {
           <div>
             <p style={{ color: ct, fontWeight: 700, fontSize: 15, margin: 0 }}>Estado de mantenimiento</p>
             <p style={{ color: cs, fontSize: 11, margin: '2px 0 0' }}>
-              Calculado con {moto.kilometraje.toLocaleString('es-EC')} km actuales
+              Calculado con {carro.kilometraje.toLocaleString('es-EC')} km actuales
             </p>
           </div>
         </div>
-        <EstadoMotoLive moto={moto} />
+        <EstadoCarroLive carro={carro} />
       </div>
 
       {/* ── Estadísticas + historial de servicios ── */}
@@ -436,7 +436,7 @@ export default function MotoPerfilPage() {
           </div>
           {canManage && (
             <Link
-              to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
+              to={`/diagnostico?carro_id=${carro.id_vehiculo}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'rgba(59,130,246,0.8)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '6px 14px', textDecoration: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.18)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.10)')}
@@ -464,7 +464,7 @@ export default function MotoPerfilPage() {
             </p>
             {canManage && (
               <Link
-                to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
+                to={`/diagnostico?carro_id=${carro.id_vehiculo}`}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#3B82F6', borderRadius: 9, padding: '9px 20px', textDecoration: 'none' }}
               >
                 <Plus size={13} /> Crear diagnóstico

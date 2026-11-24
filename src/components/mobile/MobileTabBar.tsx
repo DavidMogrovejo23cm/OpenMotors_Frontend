@@ -21,13 +21,13 @@ export default function MobileTabBar({ onMore }: { onMore: () => void }) {
   const esClientePuro = !isAdmin && !isMecanico;
   const tabsInternos: Tab[] = [
     { label: 'Inicio', icon: Home, to: '/dashboard' },
-    ...(canAccessModulo(user?.descripcion, 'registros', isAdmin, isMecanico)
+    ...(canAccessModulo(user?.permisos, 'registros', isAdmin, isMecanico)
       ? [{ label: 'Ordenes', icon: Wrench, to: '/registros' } as Tab]
       : []),
-    ...(canAccessModulo(user?.descripcion, 'motos', isAdmin, isMecanico)
-      ? [{ label: 'Vehículos', icon: Car, to: '/motos' } as Tab]
+    ...(canAccessModulo(user?.permisos, 'carros', isAdmin, isMecanico)
+      ? [{ label: 'Vehículos', icon: Car, to: '/carros' } as Tab]
       : []),
-    ...(canAccessModulo(user?.descripcion, 'inventario', isAdmin, isMecanico)
+    ...(canAccessModulo(user?.permisos, 'inventario', isAdmin, isMecanico)
       ? [{ label: 'Inventario', icon: Package, to: '/inventario' } as Tab]
       : []),
     { label: 'Mas', icon: LayoutGrid, more: true },
@@ -36,7 +36,7 @@ export default function MobileTabBar({ onMore }: { onMore: () => void }) {
   const tabs: Tab[] = esClientePuro
     ? [
         { label: 'Inicio', icon: Home, to: '/dashboard' },
-        { label: 'Mis vehículos', icon: Car, to: '/mi-moto' },
+        { label: 'Mis vehículos', icon: Car, to: '/mi-carro' },
         { label: 'Mas', icon: LayoutGrid, more: true },
       ]
     : tabsInternos.slice(0, 5);

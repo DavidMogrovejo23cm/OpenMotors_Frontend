@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Password Gate
+   OpenMotors — Password Gate
    Re-pide la contraseña antes de mostrar contenido
    sensible (ej. Perfiles). Desbloqueo válido por
    5 minutos en sessionStorage. Nunca guarda la clave.

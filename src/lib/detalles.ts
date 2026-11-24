@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Separación MANO DE OBRA vs REPUESTOS
+   OpenMotors — Separación MANO DE OBRA vs REPUESTOS
    Sin cambios de base de datos. El tipo se codifica en la descripción
    de los ítems que NO son de inventario (id_producto = null):
      · Repuesto de inventario  → id_producto != null

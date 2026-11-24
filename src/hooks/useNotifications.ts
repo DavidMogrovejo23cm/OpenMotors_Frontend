@@ -1,15 +1,15 @@
 /* ─────────────────────────────────────────────
-   GMotors — Hook de notificaciones automáticas
+   OpenMotors — Hook de notificaciones automáticas
    Genera alertas basadas en datos reales del sistema
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback } from 'react';
-import { motosApi, productosApi, registrosApi } from '../lib/api';
+import { carrosApi, productosApi, registrosApi } from '../lib/api';
 import { toIsoStr } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { isNativeApp } from '../lib/platform';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import type { Moto, Producto, RegistroDetalle } from '../types';
+import type { Carro, Producto, RegistroDetalle } from '../types';
 
 function hashCode(str: string) {
   let hash = 0;
@@ -22,7 +22,7 @@ function hashCode(str: string) {
 }
 
 export type NotifPriority = 'high' | 'medium' | 'low';
-export type NotifType     = 'oil_alert' | 'low_stock' | 'pending_order' | 'moto_ready' | 'info';
+export type NotifType     = 'oil_alert' | 'low_stock' | 'pending_order' | 'carro_ready' | 'info';
 
 export interface Notification {
   id:       string;
@@ -96,21 +96,21 @@ export function useNotifications() {
     if (!user || !localStorage.getItem('gm_token')) return;
     setLoading(true);
     try {
-      /* No-admin/no-mecánico (incluye usuarios sin rol) → solo SUS motos */
-      const motosReq = !canManage
-        ? motosApi.byUser(user.id_usuario)
-        : motosApi.list();
+      /* No-admin/no-mecánico (incluye usuarios sin rol) → solo SUS carros */
+      const carrosReq = !canManage
+        ? carrosApi.byUser(user.id_usuario)
+        : carrosApi.list();
       const registrosReq = isAdmin
         ? registrosApi.summary()
         : isMecanico
           ? registrosApi.byMechanic(user.id_usuario)
           : registrosApi.byClient(user.id_usuario);
       const [mr, pr, rr] = await Promise.allSettled([
-        motosReq,
+        carrosReq,
         canManage ? productosApi.list() : Promise.reject(),
         registrosReq,
       ]);
-      const motos:    Moto[]            = mr.status === 'fulfilled' ? mr.value.data : [];
+      const carros:    Carro[]            = mr.status === 'fulfilled' ? mr.value.data : [];
       const productos:Producto[]        = pr.status === 'fulfilled' ? pr.value.data : [];
       const registros:RegistroDetalle[] = rr.status === 'fulfilled' ? rr.value.data : [];
 
@@ -133,7 +133,7 @@ export function useNotifications() {
 
       /* ── 1. Alertas de aceite ── */
       const OIL_KW = ['cambio de aceite', 'aceite', 'oil'];
-      motos.forEach(m => {
+      carros.forEach(m => {
         if (m.id_usuario !== uid) return;
         const oilRecs = registros
           .filter(r => r.placa === m.placa && OIL_KW.some(k => r.tipo_servicio?.toLowerCase().includes(k)) && r.kilometraje != null)
@@ -202,20 +202,20 @@ export function useNotifications() {
           });
       }
 
-      /* ── 4. Moto lista para retirar (cliente: sus órdenes completadas/entregadas) ── */
+      /* ── 4. Carro listo para retirar (cliente: sus órdenes completadas/entregadas) ── */
       if (!canManage) {
         registros
           .filter(r => {
-            const esMiMoto = motos.some(m => m.placa === r.placa);
-            return esMiMoto && (r.estado === 2 || r.estado === 3);
+            const esMiCarro = carros.some(m => m.placa === r.placa);
+            return esMiCarro && (r.estado === 2);
           })
           .slice(0, 3)
           .forEach(r => {
             add({
-              id: genId('ready', r.id_registro), type: 'moto_ready', priority: 'high', read: false, createdAt: today,
-              title: r.estado === 3 ? `Tu moto está lista para retirar` : `Servicio completado`,
+              id: genId('ready', r.id_registro), type: 'carro_ready', priority: 'high', read: false, createdAt: today,
+              title: `Tu carro está listo para retirar`,
               message: `${r.placa} — ${r.tipo_servicio ?? 'Servicio'}. Pasa por el taller.`,
-              link: '/mi-moto',
+              link: '/mi-carro',
             });
           });
       }

@@ -1,15 +1,15 @@
 /* ─────────────────────────────────────────────
-   GMotors — Alertas de Mantenimiento
-   Monitoreo de cambios de aceite por moto
+   OpenMotors — Alertas de Mantenimiento
+   Monitoreo de cambios de aceite por carro
    Pequeñas (<300cc): cada 1000 km
    Grandes (≥300cc): cada 5000 km
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback } from 'react';
 import { Bell, CheckCircle, Car, Search, RefreshCw } from 'lucide-react';
-import { motosApi, registrosApi, usuariosApi } from '../../lib/api';
+import { carrosApi, registrosApi, usuariosApi } from '../../lib/api';
 import { usePolling } from '../../hooks/usePolling';
-import type { Moto, RegistroDetalle, Usuario, MotoAlerta } from '../../types';
+import type { Carro, RegistroDetalle, Usuario, CarroAlerta } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtDate } from '../../lib/utils';
 
@@ -18,7 +18,7 @@ const OIL_KEYWORDS = ['cambio de aceite', 'aceite', 'oil', 'mantenimiento preven
 
 function getThreshold(cc: number) { return cc >= 300 ? 5000 : 1000; }
 
-function getUrgency(km: number | null, thr: number): MotoAlerta['urgency'] {
+function getUrgency(km: number | null, thr: number): CarroAlerta['urgency'] {
   if (km === null) return 'ok';
   if (km >= thr)        return 'overdue';
   if (km >= thr * 0.8)  return 'due';
@@ -26,14 +26,14 @@ function getUrgency(km: number | null, thr: number): MotoAlerta['urgency'] {
   return 'ok';
 }
 
-const URGENCY: Record<MotoAlerta['urgency'], { label: string; color: string; bg: string; border: string }> = {
+const URGENCY: Record<CarroAlerta['urgency'], { label: string; color: string; bg: string; border: string }> = {
   overdue: { label: 'Vencido',   color: '#EF4444', bg: 'rgba(239,68,68,0.10)',  border: 'rgba(239,68,68,0.28)'  },
   due:     { label: 'Urgente',   color: '#F59E0B', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.28)' },
   soon:    { label: 'Próximo',   color: '#3B82F6', bg: 'rgba(59,130,246,0.10)', border: 'rgba(59,130,246,0.28)' },
   ok:      { label: 'Al día',    color: '#10B981', bg: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.28)' },
 };
 
-const ORDER: Record<MotoAlerta['urgency'], number> = { overdue: 0, due: 1, soon: 2, ok: 3 };
+const ORDER: Record<CarroAlerta['urgency'], number> = { overdue: 0, due: 1, soon: 2, ok: 3 };
 
 /* ── Componente ─────────────────────────────── */
 export default function AlertasPage() {
@@ -41,29 +41,29 @@ export default function AlertasPage() {
   const canManage = isAdmin || isMecanico;
   const uid = user?.id_usuario ?? 0;
 
-  const [alertas,     setAlertas]     = useState<MotoAlerta[]>([]);
+  const [alertas,     setAlertas]     = useState<CarroAlerta[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [search,      setSearch]      = useState('');
-  const [filter,      setFilter]      = useState<'all' | MotoAlerta['urgency']>('all');
+  const [filter,      setFilter]      = useState<'all' | CarroAlerta['urgency']>('all');
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const motosReq = !canManage ? motosApi.byUser(uid) : motosApi.list();
+      const carrosReq = !canManage ? carrosApi.byUser(uid) : carrosApi.list();
       const [mr, rr, ur] = await Promise.allSettled([
-        motosReq, registrosApi.list(), canManage ? usuariosApi.list() : Promise.reject(),
+        carrosReq, registrosApi.list(), canManage ? usuariosApi.list() : Promise.reject(),
       ]);
-      const motos: Moto[]               = mr.status === 'fulfilled' ? mr.value.data  : [];
+      const carros: Carro[]               = mr.status === 'fulfilled' ? mr.value.data  : [];
       const records: RegistroDetalle[]  = rr.status === 'fulfilled' ? rr.value.data  : [];
       const users: Usuario[]            = ur.status === 'fulfilled' ? ur.value.data  : [];
 
       const userMap = new Map(users.map(u => [u.id_usuario, u.nombre_completo]));
 
-      const list: MotoAlerta[] = motos.map(moto => {
-        const motoRecs = records.filter(r => r.placa === moto.placa);
-        const oilRecs  = motoRecs.filter(r =>
+      const list: CarroAlerta[] = carros.map(carro => {
+        const carroRecs = records.filter(r => r.placa === carro.placa);
+        const oilRecs  = carroRecs.filter(r =>
           OIL_KEYWORDS.some(kw =>
             r.tipo_servicio?.toLowerCase().includes(kw) ||
             r.descripcion?.toLowerCase().includes(kw)
@@ -72,14 +72,14 @@ export default function AlertasPage() {
 
         oilRecs.sort((a, b) => (b.kilometraje ?? 0) - (a.kilometraje ?? 0));
         const last    = oilRecs[0] ?? null;
-        const thr     = getThreshold(moto.cilindraje);
-        const kmSince = last?.kilometraje != null ? moto.kilometraje - last.kilometraje : null;
+        const thr     = getThreshold(carro.cilindraje);
+        const kmSince = last?.kilometraje != null ? carro.kilometraje - last.kilometraje : null;
         const urgency = getUrgency(kmSince, thr);
         const pct     = kmSince != null ? Math.min(Math.round((kmSince / thr) * 100), 130) : 0;
 
         return {
-          moto,
-          ownerName:   userMap.get(moto.id_usuario) ?? '—',
+          carro,
+          ownerName:   userMap.get(carro.id_usuario) ?? '—',
           lastOilKm:   last?.kilometraje ?? null,
           lastOilDate: last?.fecha ?? null,
           kmSinceOil:  kmSince,
@@ -114,9 +114,9 @@ export default function AlertasPage() {
     .filter(a => {
       if (!search) return true;
       const q = search.toLowerCase();
-      return a.moto.placa.toLowerCase().includes(q)
-          || a.moto.marca.toLowerCase().includes(q)
-          || a.moto.modelo.toLowerCase().includes(q)
+      return a.carro.placa.toLowerCase().includes(q)
+          || a.carro.marca.toLowerCase().includes(q)
+          || a.carro.modelo.toLowerCase().includes(q)
           || a.ownerName.toLowerCase().includes(q);
     });
 
@@ -137,7 +137,7 @@ export default function AlertasPage() {
           <div className="flex items-center gap-2 mb-1">
             <Bell size={13} className="text-gm-red/60" />
             <span className="text-[10px] tracking-[0.3em] uppercase dark:text-white/28 text-slate-900/28 font-bold">
-              Open Motors · Alertas
+              OpenMotors · Alertas
             </span>
           </div>
           <h1 className="text-[2rem] font-black dark:text-white text-slate-900 leading-tight tracking-tight">
@@ -227,11 +227,11 @@ export default function AlertasPage() {
 
           return (
             <div
-              key={a.moto.id_vehiculo}
+              key={a.carro.id_vehiculo}
               className="gm-card-d rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-5"
               style={{ borderColor: a.urgency !== 'ok' ? cfg.border : undefined }}
             >
-              {/* Ícono + info moto */}
+              {/* Ícono + info carro */}
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div
                   className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
@@ -241,7 +241,7 @@ export default function AlertasPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="plate-tag">{a.moto.placa}</span>
+                    <span className="plate-tag">{a.carro.placa}</span>
                     <span
                       className="px-2 py-0.5 rounded-full text-[10px] font-black"
                       style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}
@@ -250,7 +250,7 @@ export default function AlertasPage() {
                     </span>
                   </div>
                   <p className="dark:text-white/85 text-slate-900/85 font-bold text-sm truncate">
-                    {a.moto.marca} {a.moto.modelo} {a.moto.anio}
+                    {a.carro.marca} {a.carro.modelo} {a.carro.anio}
                   </p>
                   <p className="dark:text-white/35 text-slate-900/35 text-xs truncate">
                     {a.ownerName}
@@ -295,7 +295,7 @@ export default function AlertasPage() {
               <div className="shrink-0 text-right min-w-[100px]">
                 <p className="text-[11px] dark:text-white/28 text-slate-900/28 mb-0.5">Km actual</p>
                 <p className="text-2xl font-black dark:text-white text-slate-900 leading-none">
-                  {a.moto.kilometraje.toLocaleString()}
+                  {a.carro.kilometraje.toLocaleString()}
                 </p>
                 {kmOver != null && (
                   <p className="text-[11px] font-black mt-1" style={{ color: cfg.color }}>

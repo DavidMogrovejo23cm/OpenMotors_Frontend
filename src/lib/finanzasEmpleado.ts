@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   Open Motors — Capa de datos: finanzas y permisos por empleado.
+   OpenMotors — Capa de datos: finanzas y permisos por empleado.
    Persistencia en localStorage (intercambiable por API real
    simplemente cambiando esta implementación, sin tocar la UI).
    ───────────────────────────────────────────── */
@@ -21,29 +21,18 @@ export interface PagoEmpleado {
 }
 
 export const MODULOS = [
-  { key: 'ventas',     label: 'Ventas'              },
-  { key: 'caja',       label: 'Caja registradora'   },
-  { key: 'inventario', label: 'Inventario'          },
-  { key: 'registros',  label: 'Registros / servicios' },
-  { key: 'motos',      label: 'Motos'               },
-  { key: 'clientes',   label: 'Clientes'            },
+  { key: 'recepcion', label: 'Registrar clientes y carros en recepción' },
+  { key: 'inventario_entradas', label: 'Gestionar productos y entradas de inventario' },
+  { key: 'inventario_consumos', label: 'Registrar repuestos en órdenes asignadas' },
 ] as const;
-
 export type ModuloKey = (typeof MODULOS)[number]['key'];
 export type PermisosEmpleado = Record<ModuloKey, boolean>;
-
-/** Permisos por defecto para un Mecánico recién creado. */
 export const PERMISOS_DEFAULT: PermisosEmpleado = {
-  ventas:     true,
-  caja:       true,
-  inventario: true,
-  registros:  true,
-  motos:      true,
-  clientes:   false,
+  recepcion: false, inventario_entradas: false, inventario_consumos: false,
 };
 
 const KEY_PAGOS    = (id: number) => `gm_pagos_${id}`;
-const KEY_PERMISOS = (id: number) => `gm_permisos_${id}`;
+
 
 /* ─── Utilidad: id corto pseudo-aleatorio (no necesitamos uuid full) ─── */
 const shortId = () =>
@@ -118,18 +107,4 @@ export function resumenFinanzas(idEmpleado: number, anio = new Date().getFullYea
   };
 }
 
-/* ═══════════════════ PERMISOS ═══════════════════ */
-
-export function obtenerPermisos(idEmpleado: number): PermisosEmpleado {
-  try {
-    const raw = localStorage.getItem(KEY_PERMISOS(idEmpleado));
-    if (!raw) return { ...PERMISOS_DEFAULT };
-    return { ...PERMISOS_DEFAULT, ...JSON.parse(raw) } as PermisosEmpleado;
-  } catch {
-    return { ...PERMISOS_DEFAULT };
-  }
-}
-
-export function guardarPermisos(idEmpleado: number, permisos: PermisosEmpleado): void {
-  localStorage.setItem(KEY_PERMISOS(idEmpleado), JSON.stringify(permisos));
-}
+// Las autorizaciones se consultan y guardan con usuariosApi, en el servidor.

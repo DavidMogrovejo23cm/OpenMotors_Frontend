@@ -1,18 +1,22 @@
+import { Link, useNavigate } from 'react-router-dom';
 import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
-   Open Motors — Registros de Servicio
+   OpenMotors — Registros de Servicio
    5 estados · Nueva Orden · Historial cliente
    Impresión · Teléfono admin · Km auto-llenado
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import XLSX from 'xlsx-js-style';
 import {
   Search, Wrench, CheckCircle, Clock, Loader, ChevronRight,
-  Plus, Printer, Phone, Package, FileText, History, X, Gauge,
+  Plus, Printer, Phone, Package, History, X, Gauge,
   UserPlus, Zap, AlertTriangle, CreditCard, MapPin,
+  Download, MessageCircle, Calendar,
 } from 'lucide-react';
 import gsap from 'gsap';
-import { registrosApi, usuariosApi, motosApi, tiposApi, mantenimientosApi, productosApi } from '../../lib/api';
+import { registrosApi, usuariosApi, carrosApi, tiposApi, mantenimientosApi, productosApi, type ReporteTrabajosResp } from '../../lib/api';
+import { buildOrderWhatsappUrl } from '../../lib/whatsapp';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
@@ -23,7 +27,7 @@ import { calcularEstadoLocal } from '../../lib/mantenimiento';
 import { WORKSHOP_CONTACT } from '../../lib/constants';
 import { usePolling } from '../../hooks/usePolling';
 import { cleanDescripcion, detalleKind } from '../../lib/detalles';
-import type { RegistroDetalle, Usuario, Moto, Tipo, Producto } from '../../types';
+import type { RegistroDetalle, Usuario, Carro, Tipo, Producto } from '../../types';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -34,9 +38,8 @@ const ESTADOS = [
   { value: -1, label: 'Todos',      icon: null         },
   { value: 0,  label: 'Pendiente',  icon: Clock        },
   { value: 1,  label: 'En proceso', icon: Loader       },
-  { value: 2,  label: 'Completado', icon: CheckCircle  },
+  { value: 2,  label: 'Finalizada', icon: CheckCircle  },
   { value: 3,  label: 'Entregado',  icon: Package      },
-  { value: 4,  label: 'Facturado',  icon: FileText     },
 ];
 
 type BadgeVar = 'warning' | 'info' | 'success' | 'purple' | 'teal' | 'default';
@@ -44,7 +47,7 @@ const VARIANT_MAP: Record<number, BadgeVar> = {
   0: 'warning', 1: 'info', 2: 'success', 3: 'purple', 4: 'teal',
 };
 
-/* Partes que el cliente puede reportar con falla al ingresar la moto */
+/* Partes que el cliente puede reportar con falla al ingresar el carro */
 const PARTES_FALLA = [
   'Motor', 'Frenos', 'Llantas', 'Transmisión / Cadena', 'Suspensión',
   'Sistema eléctrico', 'Carrocería', 'Refrigeración', 'Embrague',
@@ -109,7 +112,7 @@ function SearchDropdown<T>({
       ) : (
         <div className="relative">
           <input
-            className="gm-input-d w-full pr-8"
+            className="gm-input-d w-full has-suffix !pr-9"
             placeholder={placeholder}
             value={q}
             onChange={(e) => { setQ(e.target.value); setOpen(true); }}
@@ -147,6 +150,7 @@ export default function RecordsPage() {
   const pageRef = useRef<HTMLDivElement>(null);
   const toast   = useToast();
   const { user: me, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [theme] = useTheme();
   const isDark  = theme === 'dark';
 
@@ -160,7 +164,7 @@ export default function RecordsPage() {
   /* ─── Datos auxiliares ─── */
   const [usuarios,   setUsuarios]   = useState<Usuario[]>([]);
   const [tipos,      setTipos]      = useState<Tipo[]>([]);
-  const [todasMotos, setTodasMotos] = useState<Moto[]>([]);
+  const [todasCarros, setTodasCarros] = useState<Carro[]>([]);
   const [productos,  setProductos]  = useState<Producto[]>([]);
 
   /* ─── Nueva Orden ─── */
@@ -171,7 +175,7 @@ export default function RecordsPage() {
 
   const [newOrderOpen,   setNewOrderOpen]   = useState(false);
   const [nCliente,       setNCliente]       = useState<Usuario | null>(null);
-  const [nMoto,          setNMoto]          = useState<Moto | null>(null);
+  const [nCarro,          setNCarro]          = useState<Carro | null>(null);
   const [nTipo,          setNTipo]          = useState<Tipo | null>(null);
   const [nKm,            setNKm]            = useState('');
   const [nObs,           setNObs]           = useState('');
@@ -179,7 +183,22 @@ export default function RecordsPage() {
   const [nPartes,        setNPartes]        = useState<string[]>([]);
   const [nFecha,         setNFecha]         = useState(isoDateOffset());
   const [nFechaEntrega,  setNFechaEntrega]  = useState(isoDateOffset(1));
+  const [nHorasEst,      setNHorasEst]      = useState('');
   const [creatingOrder,  setCreatingOrder]  = useState(false);
+
+  /* ─── Vista Reporte de Trabajos por Período (RF-54 / HU-65) ─── */
+  const [vista, setVista] = useState<'ordenes' | 'reporte'>('ordenes');
+  const [repInicio, setRepInicio] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [repFin, setRepFin] = useState(isoDateOffset());
+  const [repEstado, setRepEstado] = useState<string>('');
+  const [repMecanico, setRepMecanico] = useState<string>('');
+  const [repTipo, setRepTipo] = useState<string>('');
+  const [repData, setRepData] = useState<ReporteTrabajosResp | null>(null);
+  const [repLoading, setRepLoading] = useState(false);
 
   /* ─── Búsqueda por placa + creación rápida ─── */
   const [plateQuery,    setPlateQuery]    = useState('');
@@ -192,12 +211,12 @@ export default function RecordsPage() {
   const [qDireccion,    setQDireccion]    = useState('');
   const [qMarca,        setQMarca]        = useState('');
   const [qModelo,       setQModelo]       = useState('');
-  const [qTipoMoto,     setQTipoMoto]     = useState('Otro');
-  const [nMotoServicios, setNMotoServicios] = useState<Record<string, number>>({});
+  const [qTipoCarro,     setQTipoCarro]     = useState('Otro');
+  const [nCarroServicios, setNCarroServicios] = useState<Record<string, number>>({});
 
   /* ─── Editor de factura (mano de obra + repuestos) ─── */
   const [facturaTarget,  setFacturaTarget]  = useState<RegistroDetalle | null>(null);
-  const [facturaCompletar, setFacturaCompletar] = useState(false);
+  const [, setFacturaCompletar] = useState(false);
 
   /* ─── Historial cliente ─── */
   const [historyOpen,   setHistoryOpen]   = useState(false);
@@ -229,13 +248,13 @@ export default function RecordsPage() {
         const [rRes, uRes, mRes, tRes, pRes] = await Promise.allSettled([
           registrosApi.list(),
           usuariosApi.list(),
-          motosApi.list(),
+          carrosApi.list(),
           tiposApi.list(),
           productosApi.list(),
         ]);
         if (rRes.status === 'fulfilled') setRegistros(rRes.value.data as RegistroDetalle[]);
         if (uRes.status === 'fulfilled') setUsuarios(uRes.value.data as Usuario[]);
-        if (mRes.status === 'fulfilled') setTodasMotos(mRes.value.data as Moto[]);
+        if (mRes.status === 'fulfilled') setTodasCarros(mRes.value.data as Carro[]);
         if (tRes.status === 'fulfilled') setTipos(tRes.value.data as Tipo[]);
         if (pRes.status === 'fulfilled') setProductos(pRes.value.data as Producto[]);
         // Si usuarios respondió (aunque sea vacío) → conexión OK, salir
@@ -254,20 +273,20 @@ export default function RecordsPage() {
   /* Refresco silencioso: actualiza datos sin re-animar la UI */
   usePolling(() => fetchData(true), { intervalMs: 120_000 });
 
-  /* Mantenimientos (nube) de la moto seleccionada → para las recomendaciones por km */
-  const idMotoSeleccionada = nMoto?.id_vehiculo;
+  /* Mantenimientos (nube) del carro seleccionado → para las recomendaciones por km */
+  const idCarroSeleccionado = nCarro?.id_vehiculo;
   useEffect(() => {
-    if (!idMotoSeleccionada) { setNMotoServicios({}); return; }
-    mantenimientosApi.byMoto(idMotoSeleccionada)
+    if (!idCarroSeleccionado) { setNCarroServicios({}); return; }
+    mantenimientosApi.byCarro(idCarroSeleccionado)
       .then(({ data }) => {
         const sm: Record<string, number> = {};
         (data as { tipo: string; kmServicio: number }[]).forEach(x => {
           sm[x.tipo] = Math.max(sm[x.tipo] ?? 0, x.kmServicio);
         });
-        setNMotoServicios(sm);
+        setNCarroServicios(sm);
       })
-      .catch(() => setNMotoServicios({}));
-  }, [idMotoSeleccionada]);
+      .catch(() => setNCarroServicios({}));
+  }, [idCarroSeleccionado]);
 
   /* ─── Animación ─── */
   useEffect(() => {
@@ -285,16 +304,11 @@ export default function RecordsPage() {
 
   /* ─── Avanzar estado ─── */
   const cambiarEstado = async (id: number, nuevoEstado: number) => {
-    // Al pasar a Completado (2): abrir el editor de factura (mano de obra + repuestos)
-    if (nuevoEstado === 2) {
-      const reg = registros.find(r => r.id_registro === id);
-      if (reg) { setFacturaTarget(reg); setFacturaCompletar(true); return; }
-    }
     setUpdating(id);
     try {
-      await registrosApi.estado(id, nuevoEstado);
+      const { data } = await registrosApi.estado(id, nuevoEstado);
       setRegistros((prev) =>
-        prev.map((r) => r.id_registro === id ? { ...r, estado: nuevoEstado } : r),
+        prev.map((r) => r.id_registro === id ? data as RegistroDetalle : r),
       );
       toast.success('Estado actualizado');
     } catch (err) { toast.error(getErrorMsg(err)); }
@@ -320,20 +334,21 @@ export default function RecordsPage() {
   /* ─── Crear nueva orden ─── */
   const resetNewOrder = () => {
     setQuickClient(null);
-    setNCliente(null); setNMoto(null); setNTipo(null);
+    setNCliente(null); setNCarro(null); setNTipo(null);
     setNKm(''); setNObs(''); setNManCustom(''); setNPartes([]);
     setNFecha(isoDateOffset()); setNFechaEntrega(isoDateOffset(1));
+    setNHorasEst('');
     setPlateQuery(''); setShowQuick(false);
     setQNombre(''); setQCorreo(''); setQTelefono(''); setQCedula(''); setQDireccion('');
-    setQMarca(''); setQModelo(''); setQTipoMoto('Otro');
+    setQMarca(''); setQModelo(''); setQTipoCarro('Otro');
   };
 
   const togglePartes = (parte: string) =>
     setNPartes(prev => prev.includes(parte) ? prev.filter(p => p !== parte) : [...prev, parte]);
 
-  /* Selecciona una moto por placa → fija moto + su propietario */
-  const selectMotoByPlate = (m: Moto) => {
-    setNMoto(m);
+  /* Selecciona un carro por placa → fija carro + su propietario */
+  const selectCarroByPlate = (m: Carro) => {
+    setNCarro(m);
     setNKm(String(m.kilometraje ?? ''));
     setNCliente(usuarios.find(u => u.id_usuario === m.id_usuario) ?? null);
     setPlateQuery('');
@@ -351,7 +366,7 @@ export default function RecordsPage() {
     return tipos[0];
   };
 
-  /* Crear cliente + moto al instante (cliente sin tiempo) */
+  /* Crear cliente + carro al instante (cliente sin tiempo) */
   const crearRapido = async () => {
     if (!plateQuery.trim() || !qNombre.trim() || !qMarca.trim() || !qModelo.trim() || !qTelefono.trim() || !qCedula.trim() || !qDireccion.trim()) {
       toast.error('Nombre, Cédula, Teléfono, Dirección, Placa, Marca y Modelo son obligatorios');
@@ -366,7 +381,7 @@ export default function RecordsPage() {
       const esCorreoValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correoReal);
       const correo = esCorreoValido
         ? correoReal
-        : `${base}.${plateQuery.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}@gmotors.local`;
+        : `${base}.${plateQuery.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}@openmotors.local`;
       const clienteRegistrado = quickClient ?? (await usuariosApi.createClient({
         nombre_completo: qNombre.trim(),
         nombre_usuario: `${base}_${Math.floor(Math.random() * 9000 + 1000)}`,
@@ -378,23 +393,23 @@ export default function RecordsPage() {
       })).data;
       setQuickClient(clienteRegistrado);
       const nuevo = clienteRegistrado.usuario;
-      // 3. Crear la moto a su nombre
-      const { data: nuevaMoto } = await motosApi.create({
+      // 3. Crear el carro a su nombre
+      const { data: nuevoCarro } = await carrosApi.create({
         placa:       plateQuery.trim().toUpperCase(),
         marca:       qMarca.trim(),
         modelo:      qModelo.trim(),
         anio:        new Date().getFullYear(),
-        tipo_vehiculo:   qTipoMoto,
+        tipo_vehiculo:   qTipoCarro,
         kilometraje: 0,
         id_usuario:  nuevo.id_usuario,
       });
 
       toast.success('Cliente y vehículo creados');
       // Refrescar listas y seleccionar
-      const [uRes, mRes] = await Promise.allSettled([usuariosApi.list(), motosApi.list()]);
+      const [uRes, mRes] = await Promise.allSettled([usuariosApi.list(), carrosApi.list()]);
       if (uRes.status === 'fulfilled') setUsuarios(uRes.value.data as Usuario[]);
-      if (mRes.status === 'fulfilled') setTodasMotos(mRes.value.data as Moto[]);
-      setNMoto(nuevaMoto as Moto);
+      if (mRes.status === 'fulfilled') setTodasCarros(mRes.value.data as Carro[]);
+      setNCarro(nuevoCarro as Carro);
       setNCliente(nuevo);
       setNKm('0');
       setShowQuick(false);
@@ -404,7 +419,7 @@ export default function RecordsPage() {
   };
 
   const createOrder = async () => {
-    if (!nMoto || !nKm || !me) {
+    if (!nCarro || !nKm || !me) {
       toast.error('Selecciona un vehículo (por placa) e ingresa el kilometraje');
       return;
     }
@@ -412,7 +427,7 @@ export default function RecordsPage() {
       toast.error('La entrega estimada no puede ser anterior a la fecha de ingreso');
       return;
     }
-    const cliente = nCliente ?? usuarios.find(u => u.id_usuario === nMoto.id_usuario);
+    const cliente = nCliente ?? usuarios.find(u => u.id_usuario === nCarro.id_usuario);
     const tipo    = nTipo ?? tipoPorDefecto();
     if (!cliente || !tipo) {
       toast.error('Falta el propietario del vehículo o no hay tipos de servicio configurados');
@@ -427,14 +442,16 @@ export default function RecordsPage() {
       const obsFinal = [fallaTxt, (nObs || nManCustom)].filter(Boolean).join(' ')
         || 'Sin observaciones adicionales';
 
-      await registrosApi.create({
+      const created = await registrosApi.create({
+        flujo_integrado: true,
         idCliente:   cliente.id_usuario,
         idEncargado: me.id_usuario,
-        id_vehiculo: nMoto.id_vehiculo,
+        id_vehiculo: nCarro.id_vehiculo,
         idTipo:      tipo.id_tipo,
-        estado:      1, // arranca En proceso — el precio se agrega después
+        estado:      0, // pendiente hasta comenzar el trabajo
         fecha:        nFecha,
         fechaEntregaEstimada: nFechaEntrega || null,
+        horas_estimadas: nHorasEst !== '' ? Number(nHorasEst) : null,
         observaciones: obsFinal,
         kilometraje: parseInt(nKm, 10),
         detalles: [{
@@ -444,7 +461,8 @@ export default function RecordsPage() {
           precioUnitario:  0,
         }],
       });
-      toast.success('Orden creada · En proceso');
+      toast.success('Orden creada · Completa su recepción');
+      navigate(`/ordenes/${created.data.id_registro}`);
       setNewOrderOpen(false);
       resetNewOrder();
       fetchData();
@@ -513,7 +531,7 @@ export default function RecordsPage() {
 
     w.document.write(`<!DOCTYPE html><html lang="es"><head>
       <meta charset="UTF-8">
-      <title>Open Motors — Nota de Venta #${r.id_registro}</title>
+      <title>OpenMotors — Nota de Venta #${r.id_registro}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
       <style>
@@ -607,7 +625,7 @@ export default function RecordsPage() {
       <!-- HEADER -->
       <div class="header">
         <div class="logo-wrap">
-          <img src="${logoUrl}" alt="Open Motors">
+          <img src="${logoUrl}" alt="OpenMotors">
           <div class="brand-text">
             <div class="brand-name">Open <em>Motors</em></div>
             <div class="brand-sub">Cuenca · Ecuador · Est. 2022</div>
@@ -620,7 +638,7 @@ export default function RecordsPage() {
         </div>
       </div>
 
-      <!-- FOTO MOTO + PLACA -->
+      <!-- FOTO CARRO + PLACA -->
       ${r.ruta_imagen_vehiculo ? `
       <div style="position:relative;border-radius:14px;overflow:hidden;height:140px;margin:14px 0;border:1px solid #EEF1F5">
         <img src="${r.ruta_imagen_vehiculo}" alt="${r.placa}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.style.display='none'">
@@ -709,11 +727,11 @@ export default function RecordsPage() {
       <!-- GRACIAS -->
       <div class="thanks">
         <div class="thanks-main">Gracias por su confianza, estimado/a ${r.nombre_cliente?.split(' ')[0] ?? 'cliente'}.</div>
-        <div class="thanks-sub">Open Motors · ${WORKSHOP_CONTACT.direccion} · ${WORKSHOP_CONTACT.telefono} · ${WORKSHOP_CONTACT.horario}</div>
+        <div class="thanks-sub">OpenMotors · ${WORKSHOP_CONTACT.direccion} · ${WORKSHOP_CONTACT.telefono} · ${WORKSHOP_CONTACT.horario}</div>
       </div>
 
       <div class="foot">
-        <span>Open Motors S.A.S. · ${WORKSHOP_CONTACT.web}</span>
+        <span>OpenMotors S.A.S. · ${WORKSHOP_CONTACT.web}</span>
         <span>${WORKSHOP_CONTACT.email}</span>
         <span>© ${new Date().getFullYear()}</span>
       </div>
@@ -765,13 +783,61 @@ export default function RecordsPage() {
       .summary{display:flex;justify-content:space-between;margin-top:22px;padding:18px;background:#172033;color:#fff}.summary b{font-size:24px}.recommend{margin-top:14px;padding:14px;border-left:4px solid #f59e0b;background:#fffbeb;font-size:13px}
       @media print{body{background:#fff;padding:0}main{max-width:none;padding:18px}.no-print{display:none}}
     </style></head><body><main>
-      <h1>Historial general de vehículos</h1><p class="sub">Open Motors · Emitido ${fmtDate(isoDateOffset())}</p>
+      <h1>Historial general de vehículos</h1><p class="sub">OpenMotors · Emitido ${fmtDate(isoDateOffset())}</p>
       <div class="client"><span><b>Cliente:</b> ${historyName}</span><span><b>CI/RUC:</b> ${cedula}</span><span><b>Telefono:</b> ${telefono}</span><span><b>Correo:</b> ${correo}</span><span style="grid-column:1/-1"><b>Direccion:</b> ${direccion}</span></div>
       ${rows}
       <div class="summary"><span>${clientHistory.length} servicios registrados</span><b>${fmtMoney(total)}</b></div>
       ${latestKm > 0 ? `<div class="recommend"><b>Seguimiento recomendado:</b> revisar el plan de mantenimiento al llegar aproximadamente a ${(latestKm + 1000).toLocaleString('es-EC')} km, ajustandolo segun el manual del vehículo.</div>` : ''}
     </main></body></html>`);
     w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
+  };
+
+  const consultarReporte = useCallback(async () => {
+    if (repInicio && repFin && repInicio > repFin) {
+      toast.error('La fecha de inicio no puede ser mayor a la fecha final');
+      return;
+    }
+    setRepLoading(true);
+    try {
+      const { data } = await registrosApi.reporteTrabajos({
+        fecha_inicio: repInicio || undefined,
+        fecha_fin: repFin || undefined,
+        estado: repEstado !== '' ? Number(repEstado) : undefined,
+        id_encargado: repMecanico !== '' ? Number(repMecanico) : undefined,
+        id_tipo: repTipo !== '' ? Number(repTipo) : undefined,
+      });
+      setRepData(data);
+    } catch (err) {
+      toast.error(getErrorMsg(err) || 'Error al generar reporte de trabajos');
+    } finally {
+      setRepLoading(false);
+    }
+  }, [repInicio, repFin, repEstado, repMecanico, repTipo, toast]);
+
+  const exportarReporteExcel = () => {
+    if (!repData || !repData.items.length) {
+      toast.error('No hay registros en el reporte para exportar');
+      return;
+    }
+    const filas = repData.items.map(it => ({
+      'N° Orden': `ORD-${String(it.id_registro).padStart(6, '0')}`,
+      'Fecha Ingreso': it.fecha,
+      'Placa': it.placa,
+      'Vehículo': `${it.marca_vehiculo} ${it.modelo_vehiculo}`.trim(),
+      'Cliente': it.nombre_cliente,
+      'Mecánico': it.nombre_encargado ?? 'Por asignar',
+      'Servicio': it.tipo_servicio,
+      'Estado': ESTADO_REGISTRO[it.estado]?.label ?? String(it.estado),
+      'Horas': it.horas_trabajadas,
+      'Total ($)': it.costo_total,
+      'Cobrado ($)': it.monto_pagado ?? 0,
+      'Pendiente ($)': it.saldo_pendiente ?? 0,
+    }));
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Trabajos');
+    XLSX.writeFile(wb, `reporte_trabajos_${repInicio || 'inicio'}_${repFin || 'hoy'}.xlsx`);
+    toast.success('Reporte Excel descargado');
   };
 
   /* ─── Filtro de fecha rápido ─── */
@@ -809,19 +875,18 @@ export default function RecordsPage() {
     1: registros.filter((r) => r.estado === 1).length,
     2: registros.filter((r) => r.estado === 2).length,
     3: registros.filter((r) => r.estado === 3).length,
-    4: registros.filter((r) => r.estado === 4).length,
   };
 
   const clientPhone = isAdmin && nCliente ? extractPhone(nCliente.descripcion) : null;
 
-  /* Motos que coinciden con la placa buscada */
+  /* Carros que coinciden con la placa buscada */
   const plateMatches = plateQuery.trim().length >= 2
-    ? todasMotos.filter(m => m.placa.toLowerCase().includes(plateQuery.trim().toLowerCase())).slice(0, 6)
+    ? todasCarros.filter(m => m.placa.toLowerCase().includes(plateQuery.trim().toLowerCase())).slice(0, 6)
     : [];
 
-  /* Mantenimientos recomendados (vencidos/próximos) para la moto seleccionada */
-  const recomendaciones = nMoto
-    ? calcularEstadoLocal(nMoto.cilindraje, nMoto.kilometraje, nMotoServicios)
+  /* Mantenimientos recomendados (vencidos/próximos) paral carro seleccionado */
+  const recomendaciones = nCarro
+    ? calcularEstadoLocal(nCarro.cilindraje, nCarro.kilometraje, nCarroServicios)
         .filter(e => e.estado !== 'OK')
         .sort((a, b) => b.porcentajeDesgaste - a.porcentajeDesgaste)
     : [];
@@ -830,9 +895,8 @@ export default function RecordsPage() {
   const STATUS_CARDS = [
     { estado: 0, label: 'Pendientes',  icon: Clock,       color: 'text-amber-400',   glow: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)' },
     { estado: 1, label: 'En proceso',  icon: Loader,      color: 'text-blue-400',    glow: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)' },
-    { estado: 2, label: 'Completados', icon: CheckCircle, color: 'text-emerald-400', glow: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)' },
+    { estado: 2, label: 'Finalizadas', icon: CheckCircle, color: 'text-emerald-400', glow: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)' },
     { estado: 3, label: 'Entregados',  icon: Package,     color: 'text-purple-400',  glow: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.35)' },
-    { estado: 4, label: 'Facturados',  icon: FileText,    color: 'text-teal-400',    glow: 'rgba(20,184,166,0.12)', border: 'rgba(20,184,166,0.35)' },
   ];
 
   return (
@@ -850,10 +914,126 @@ export default function RecordsPage() {
           </h1>
           <p className="dark:text-white/35 text-slate-900/35 text-sm mt-1">{registros.length} órdenes en total</p>
         </div>
-        <Button icon={<Plus size={15} />} onClick={() => setNewOrderOpen(true)}>
-          Nueva orden
-        </Button>
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setVista('ordenes')}
+                className={`px-3.5 py-2 text-xs font-bold transition-colors ${vista === 'ordenes' ? 'bg-gm-red text-white' : 'dark:text-white/60 text-slate-600'}`}
+              >
+                Órdenes
+              </button>
+              <button
+                type="button"
+                onClick={() => { setVista('reporte'); if (!repData) void consultarReporte(); }}
+                className={`px-3.5 py-2 text-xs font-bold transition-colors ${vista === 'reporte' ? 'bg-gm-red text-white' : 'dark:text-white/60 text-slate-600'}`}
+              >
+                Reporte por período
+              </button>
+            </div>
+            <Button icon={<Plus size={15} />} onClick={() => setNewOrderOpen(true)}>
+              Nueva orden
+            </Button>
+          </div>
+        )}
       </div>
+
+      {vista === 'reporte' && isAdmin ? (
+        <div className="space-y-5">
+          <div className="gm-card-d rounded-2xl p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <label className="text-xs font-semibold block">
+                <span className="flex items-center gap-1 mb-1 opacity-70"><Calendar size={12} /> Desde</span>
+                <input type="date" className="gm-input-d w-full" value={repInicio} onChange={e => setRepInicio(e.target.value)} />
+              </label>
+              <label className="text-xs font-semibold block">
+                <span className="flex items-center gap-1 mb-1 opacity-70"><Calendar size={12} /> Hasta</span>
+                <input type="date" className="gm-input-d w-full" value={repFin} onChange={e => setRepFin(e.target.value)} />
+              </label>
+              <label className="text-xs font-semibold block">
+                <span className="block mb-1 opacity-70">Estado</span>
+                <select className="gm-select-d w-full" value={repEstado} onChange={e => setRepEstado(e.target.value)}>
+                  <option value="">Todos</option>
+                  <option value="0">Pendiente</option>
+                  <option value="1">En proceso</option>
+                  <option value="2">Finalizada</option>
+                  <option value="3">Entregada</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold block">
+                <span className="block mb-1 opacity-70">Mecánico</span>
+                <select className="gm-select-d w-full" value={repMecanico} onChange={e => setRepMecanico(e.target.value)}>
+                  <option value="">Todos</option>
+                  {usuarios.filter(u => u.roles?.some(ro => ro.estado === 1 && ro.rol?.nombre === 'MECANICO')).map(m => (
+                    <option key={m.id_usuario} value={m.id_usuario}>{m.nombre_completo}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-semibold block">
+                <span className="block mb-1 opacity-70">Servicio</span>
+                <select className="gm-select-d w-full" value={repTipo} onChange={e => setRepTipo(e.target.value)}>
+                  <option value="">Todos</option>
+                  {tipos.map(t => (
+                    <option key={t.id_tipo} value={t.id_tipo}>{t.nombre}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button variant="secondary" onClick={exportarReporteExcel} disabled={!repData?.items.length} icon={<Download size={14} />}>
+                Exportar Excel
+              </Button>
+              <Button onClick={consultarReporte} loading={repLoading}>
+                Consultar reporte
+              </Button>
+            </div>
+          </div>
+
+          {repData && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="gm-card-d rounded-xl p-4"><p className="text-xs opacity-60">Órdenes</p><p className="text-xl font-black">{repData.resumen.total_ordenes}</p></div>
+                <div className="gm-card-d rounded-xl p-4"><p className="text-xs opacity-60">Facturado</p><p className="text-xl font-black text-blue-400">{fmtMoney(repData.resumen.total_facturado)}</p></div>
+                <div className="gm-card-d rounded-xl p-4"><p className="text-xs opacity-60">Cobrado</p><p className="text-xl font-black text-emerald-400">{fmtMoney(repData.resumen.total_cobrado)}</p></div>
+                <div className="gm-card-d rounded-xl p-4"><p className="text-xs opacity-60">Pendiente</p><p className="text-xl font-black text-amber-400">{fmtMoney(repData.resumen.total_pendiente)}</p></div>
+                <div className="gm-card-d rounded-xl p-4"><p className="text-xs opacity-60">Horas taller</p><p className="text-xl font-black text-purple-400">{repData.resumen.horas_trabajadas_totales} h</p></div>
+              </div>
+
+              <div className="gm-card-d rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="gm-table-d">
+                    <thead>
+                      <tr>
+                        <th>Orden</th><th>Fecha</th><th>Placa</th><th>Cliente</th><th>Mecánico</th><th>Servicio</th><th>Estado</th><th>Horas</th><th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repData.items.map(it => (
+                        <tr key={it.id_registro}>
+                          <td><Link to={`/ordenes/${it.id_registro}`} className="font-bold text-gm-red">#{it.id_registro}</Link></td>
+                          <td className="text-xs">{fmtDate(it.fecha)}</td>
+                          <td><span className="plate-tag">{it.placa}</span></td>
+                          <td>{it.nombre_cliente}</td>
+                          <td>{it.nombre_encargado}</td>
+                          <td>{it.tipo_servicio}</td>
+                          <td>{ESTADO_REGISTRO[it.estado]?.label ?? it.estado}</td>
+                          <td>{it.horas_trabajadas} h</td>
+                          <td className="font-bold">{fmtMoney(it.costo_total)}</td>
+                        </tr>
+                      ))}
+                      {!repData.items.length && (
+                        <tr><td colSpan={9} className="text-center py-8 opacity-50">No hay trabajos registrados en este período y filtros.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <>
 
       {/* ─── Status cards (5 estados) ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -955,7 +1135,7 @@ export default function RecordsPage() {
                   : filtered.map((r) => {
                     const est     = ESTADO_REGISTRO[r.estado] ?? ESTADO_REGISTRO[0];
                     const variant = VARIANT_MAP[r.estado] ?? 'default';
-                    const nextEst = r.estado < 4 ? r.estado + 1 : null;
+                    const nextEst = r.estado < 3 ? r.estado + 1 : null;
                     const canPrint = r.estado >= 2;
 
                     return (
@@ -981,11 +1161,25 @@ export default function RecordsPage() {
                             return (
                               <div className="flex flex-col gap-0.5 mt-1 bg-white/[0.02] p-1.5 rounded border border-white/[0.05]">
                                 {tel && (
-                                  <a href={`tel:${tel}`}
-                                    className="flex items-center gap-1 text-[10px] text-emerald-400/80 hover:text-emerald-400"
-                                    onClick={e => e.stopPropagation()}>
-                                    <Phone size={9}/> {tel}
-                                  </a>
+                                  <div className="flex items-center gap-2">
+                                    <a href={`tel:${tel}`}
+                                      className="flex items-center gap-1 text-[10px] text-emerald-400/80 hover:text-emerald-400"
+                                      onClick={e => e.stopPropagation()}>
+                                      <Phone size={9}/> {tel}
+                                    </a>
+                                    {buildOrderWhatsappUrl(r, tel) && (
+                                      <a
+                                        href={buildOrderWhatsappUrl(r, tel)!}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={e => e.stopPropagation()}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 hover:underline"
+                                        title="Enviar actualización manual por WhatsApp"
+                                      >
+                                        <MessageCircle size={9} /> WhatsApp
+                                      </a>
+                                    )}
+                                  </div>
                                 )}
                                 {cedId && (
                                   <span className="flex items-center gap-1 text-[10px] dark:text-white/40 text-slate-900/40">
@@ -1016,7 +1210,8 @@ export default function RecordsPage() {
                         <td><Badge variant={variant} dot>{est.label}</Badge></td>
                         <td>
                           <div className="flex items-center gap-1.5">
-                            {nextEst !== null && (
+                            <Link className="font-bold text-red-500 text-sm" to={`/ordenes/${r.id_registro}`}>Gestionar orden</Link>
+                            {!r.flujo_integrado && nextEst !== null && (isAdmin || nextEst !== 3) && (
                               <Button
                                 size="sm"
                                 variant="secondary"
@@ -1027,7 +1222,7 @@ export default function RecordsPage() {
                                 {ESTADO_REGISTRO[nextEst]?.label}
                               </Button>
                             )}
-                            {r.estado >= 1 && (
+                            {isAdmin && !r.flujo_integrado && r.estado >= 1 && (
                               <button
                                 onClick={() => abrirFactura(r, false)}
                                 className="icon-btn"
@@ -1059,6 +1254,8 @@ export default function RecordsPage() {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* ══════ MODAL NUEVA ORDEN ══════ */}
       <Modal
@@ -1074,7 +1271,7 @@ export default function RecordsPage() {
             <Button
               onClick={createOrder}
               loading={creatingOrder}
-              disabled={!nMoto || !nKm}
+              disabled={!nCarro || !nKm}
             >
               <Plus size={14} /> Crear orden
             </Button>
@@ -1092,7 +1289,7 @@ export default function RecordsPage() {
             </div>
           )}
           {/* 1 · Buscar vehículo por placa */}
-          {!nMoto ? (
+          {!nCarro ? (
             <div>
               <label className="text-xs font-semibold dark:text-white/50 text-slate-900/50 uppercase tracking-wider block mb-1.5">
                 1 · Placa del vehículo <span className="text-gm-red">*</span>
@@ -1101,7 +1298,7 @@ export default function RecordsPage() {
               <div className="relative">
                 <Gauge size={13} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/25 text-slate-900/25 pointer-events-none" />
                 <input
-                  className="gm-input-d w-full pl-8 uppercase"
+                  className="gm-input-d w-full has-prefix !pl-9 uppercase"
                   placeholder="Ej. ABC-1234"
                   value={plateQuery}
                   onChange={(e) => { setPlateQuery(e.target.value); setShowQuick(false); }}
@@ -1118,7 +1315,7 @@ export default function RecordsPage() {
                       return (
                         <button
                           key={m.id_vehiculo}
-                          onClick={() => selectMotoByPlate(m)}
+                          onClick={() => selectCarroByPlate(m)}
                           className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all bg-white/[0.02] border-white/[0.06] hover:border-gm-red/40"
                         >
                           <span className="plate-tag text-[11px]">{m.placa}</span>
@@ -1171,7 +1368,7 @@ export default function RecordsPage() {
                     <input className="gm-input-d w-full" type="email" placeholder="Correo (si lo tiene, para que inicie sesión)" value={qCorreo} onChange={e => setQCorreo(e.target.value)} />
                   </div>
                   <div className="grid grid-cols-1 gap-3">
-                    <select className="gm-select-d" value={qTipoMoto} onChange={e => setQTipoMoto(e.target.value)}>
+                    <select className="gm-select-d" value={qTipoCarro} onChange={e => setQTipoCarro(e.target.value)}>
                       {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
@@ -1197,17 +1394,17 @@ export default function RecordsPage() {
               )}
             </div>
           ) : (
-            /* Moto seleccionada — tarjeta de confirmación */
+            /* Carro seleccionado — tarjeta de confirmación */
             <div className="flex items-center gap-3 p-3 rounded-xl bg-gm-red/[0.07] border border-gm-red/25">
-              <span className="plate-tag text-[12px]">{nMoto.placa}</span>
+              <span className="plate-tag text-[12px]">{nCarro.placa}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold dark:text-white/90 text-slate-900/90 truncate">{nMoto.marca} {nMoto.modelo}</p>
+                <p className="text-sm font-bold dark:text-white/90 text-slate-900/90 truncate">{nCarro.marca} {nCarro.modelo}</p>
                 <p className="text-[11px] dark:text-white/40 text-slate-900/40 flex items-center gap-2">
                   <span>{nCliente?.nombre_completo ?? 'Sin propietario'}</span>
                   {isAdmin && clientPhone && <span className="flex items-center gap-1"><Phone size={9} /> {clientPhone}</span>}
                 </p>
               </div>
-              <button onClick={() => { setNMoto(null); setNCliente(null); setNKm(''); setNPartes([]); }}
+              <button onClick={() => { setNCarro(null); setNCliente(null); setNKm(''); setNPartes([]); }}
                 className="text-[11px] dark:text-white/40 text-slate-900/40 hover:dark:text-white/80 text-slate-900/80 flex items-center gap-1">
                 <X size={12} /> Cambiar
               </button>
@@ -1215,10 +1412,10 @@ export default function RecordsPage() {
           )}
 
           {/* Recomendaciones de mantenimiento según km (upsell) */}
-          {nMoto && recomendaciones.length > 0 && (
+          {nCarro && recomendaciones.length > 0 && (
             <div className="p-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
               <p className="flex items-center gap-2 text-[12px] font-bold text-amber-300 mb-2">
-                <AlertTriangle size={13} /> Recomendado para este vehículo ({nMoto.kilometraje.toLocaleString('es-EC')} km)
+                <AlertTriangle size={13} /> Recomendado para este vehículo ({nCarro.kilometraje.toLocaleString('es-EC')} km)
               </p>
               <div className="flex flex-wrap gap-2">
                 {recomendaciones.map(r => {
@@ -1238,7 +1435,7 @@ export default function RecordsPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold dark:text-white/50 text-slate-900/50 uppercase tracking-wider block mb-1.5">
                 Fecha de ingreso <span className="text-gm-red">*</span>
@@ -1252,6 +1449,13 @@ export default function RecordsPage() {
               </label>
               <input type="date" className="gm-input-d w-full" value={nFechaEntrega}
                 min={nFecha} onChange={e => setNFechaEntrega(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold dark:text-white/50 text-slate-900/50 uppercase tracking-wider block mb-1.5">
+                Horas estimadas
+              </label>
+              <input type="number" min={0} step={0.5} placeholder="Ej. 3.5" className="gm-input-d w-full"
+                value={nHorasEst} onChange={e => setNHorasEst(e.target.value)} />
             </div>
           </div>
 
@@ -1313,13 +1517,13 @@ export default function RecordsPage() {
           <div>
             <label className="text-xs font-semibold dark:text-white/50 text-slate-900/50 uppercase tracking-wider block mb-1.5">
               6 · Kilometraje actual <span className="text-gm-red">*</span>
-              {nMoto && <span className="dark:text-white/25 text-slate-900/25 normal-case font-normal ml-2">(vehículo registrado: {nMoto.kilometraje.toLocaleString('es-EC')} km)</span>}
+              {nCarro && <span className="dark:text-white/25 text-slate-900/25 normal-case font-normal ml-2">(vehículo registrado: {nCarro.kilometraje.toLocaleString('es-EC')} km)</span>}
             </label>
             <div className="relative">
               <Gauge size={13} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/25 text-slate-900/25 pointer-events-none" />
               <input
                 type="number"
-                className="gm-input-d w-full pl-8"
+                className="gm-input-d w-full has-prefix !pl-9"
                 placeholder="Kilometraje al momento del ingreso"
                 value={nKm}
                 onChange={(e) => setNKm(e.target.value)}
@@ -1353,8 +1557,7 @@ export default function RecordsPage() {
         productos={productos}
         usuarios={usuarios}
         registros={registros}
-        motos={todasMotos}
-        completarAlGuardar={facturaCompletar}
+        carros={todasCarros}
         onClose={() => { setFacturaTarget(null); setFacturaCompletar(false); }}
         onSaved={onFacturaGuardada}
       />

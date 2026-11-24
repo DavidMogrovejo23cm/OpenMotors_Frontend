@@ -1,6 +1,6 @@
 import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
-   Open Motors — Motos Page  (Redesign Premium)
+   OpenMotors — Carros Page  (Redesign Premium)
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -10,17 +10,17 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import gsap from 'gsap';
-import { motosApi, usuariosApi } from '../../lib/api';
-import { comprimirImagen, imagenMoto } from '../../lib/fotos';
+import { carrosApi, usuariosApi } from '../../lib/api';
+import { comprimirImagen, imagenCarro } from '../../lib/fotos';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { getErrorMsg } from '../../lib/utils';
-import type { Moto, Usuario } from '../../types';
+import type { Carro, Usuario } from '../../types';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 
-/* Tipos de moto usados en Ecuador (talleres) — sin Scooter/Cruiser/Scrambler */
+/* Tipos de carro disponibles en el taller. */
 const TIPOS = VEHICLE_TYPES;
 
 /* Marcas comunes en Ecuador (datalist, no restringe texto libre) */
@@ -28,27 +28,27 @@ const MARCAS_EC = ['Chevrolet', 'Toyota', 'Kia', 'Hyundai', 'Suzuki', 'Nissan', 
 
 /* Color accent por tipo */
 const TIPO_CONFIG: Record<string, { color: string; bg: string; dot: string }> = {
-  Calle:       { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  dot: '#3B82F6' },
-  Deportiva:   { color: '#FF3B47', bg: 'rgba(255,59,71,0.12)',   dot: '#FF3B47' },
-  Trabajo:     { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  dot: '#F59E0B' },
-  Todoterreno: { color: '#00E676', bg: 'rgba(0,230,118,0.12)',   dot: '#00E676' },
-  Touring:     { color: '#00C9FF', bg: 'rgba(0,201,255,0.12)',   dot: '#00C9FF' },
-  Otro:        { color: '#8A8A9E', bg: 'rgba(138,138,158,0.12)', dot: '#8A8A9E' },
+  'Sedán': { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', dot: '#3B82F6' },
+  'Coupé': { color: '#FF3B47', bg: 'rgba(255,59,71,0.12)', dot: '#FF3B47' },
+  Pickup: { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', dot: '#F59E0B' },
+  SUV: { color: '#00E676', bg: 'rgba(0,230,118,0.12)', dot: '#00E676' },
+  Van: { color: '#00C9FF', bg: 'rgba(0,201,255,0.12)', dot: '#00C9FF' },
+  Otro: { color: '#8A8A9E', bg: 'rgba(138,138,158,0.12)', dot: '#8A8A9E' },
 };
 const getTipoConfig = (tipo: string) =>
   TIPO_CONFIG[tipo] ?? TIPO_CONFIG['Otro'];
 
 const schema = z.object({
-  placa:              z.string().min(6, 'Mínimo 6 caracteres').transform((v) => v.toUpperCase()),
-  anio:               z.coerce.number().int().min(1980).max(new Date().getFullYear() + 1),
-  marca:              z.string().min(2),
-  modelo:             z.string().min(1),
-  nombre_vehiculo:        z.string().optional(),
-  tipo_vehiculo:          z.string().min(1, 'Selecciona el tipo'),
-  kilometraje:        z.coerce.number().int().nonnegative(),
-  id_usuario:         z.coerce.number().positive('Selecciona un propietario'),
+  placa: z.string().min(6, 'Mínimo 6 caracteres').transform((v) => v.toUpperCase()),
+  anio: z.coerce.number().int().min(1980).max(new Date().getFullYear() + 1),
+  marca: z.string().min(2),
+  modelo: z.string().min(1),
+  nombre_vehiculo: z.string().optional(),
+  tipo_vehiculo: z.string().min(1, 'Selecciona el tipo'),
+  kilometraje: z.coerce.number().int().nonnegative(),
+  id_usuario: z.coerce.number().positive('Selecciona un propietario'),
   /* La foto NO va en el formulario: se maneja aparte (imageFile) para no
-     arrastrar valores viejos/vacíos al PUT y dañar otras motos. */
+     arrastrar valores viejos/vacíos al PUT y dañar otros carros. */
 });
 type Form = z.infer<typeof schema>;
 
@@ -56,42 +56,42 @@ type Form = z.infer<typeof schema>;
 /* ─── Skeleton Card ─── */
 function SkeletonCard() {
   return (
-    <div className="moto-card-skeleton">
-      <div className="moto-card-sk-header">
+    <div className="carro-card-skeleton">
+      <div className="carro-card-sk-header">
         <div className="sk-pill" />
         <div className="sk-actions" />
       </div>
-      <div className="moto-card-sk-body">
+      <div className="carro-card-sk-body">
         <div className="sk-title" />
         <div className="sk-sub" />
       </div>
-      <div className="moto-card-sk-stats">
+      <div className="carro-card-sk-stats">
         {[1, 2, 3, 4].map((i) => <div key={i} className="sk-stat" />)}
       </div>
-      <div className="moto-card-sk-footer" />
+      <div className="carro-card-sk-footer" />
     </div>
   );
 }
 
-/* ─── Moto Card Premium ─── */
-function MotoCard({
-  moto, ownerName, onEdit, onDelete, canManage = false,
+/* ─── Carro Card Premium ─── */
+function CarroCard({
+  carro, ownerName, onEdit, onDelete, canManage = false, canDelete = false,
 }: {
-  moto: Moto; ownerName: string; index?: number;
-  onEdit: (m: Moto) => void; onDelete: (m: Moto) => void;
-  canManage?: boolean;
+  carro: Carro; ownerName: string; index?: number;
+  onEdit: (m: Carro) => void; onDelete: (m: Carro) => void;
+  canManage?: boolean; canDelete?: boolean;
 }) {
-  const navigate  = useNavigate();
-  const cardRef   = useRef<HTMLDivElement>(null);
-  const glowRef   = useRef<HTMLDivElement>(null);
-  const tc = getTipoConfig(moto.tipo_vehiculo);
+  const navigate = useNavigate();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
+  const tc = getTipoConfig(carro.tipo_vehiculo);
 
   /* Mouse parallax glow */
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !glowRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width)  * 100;
-    const y = ((e.clientY - rect.top)  / rect.height) * 100;
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
     glowRef.current.style.background =
       `radial-gradient(circle at ${x}% ${y}%, ${tc.color}18 0%, transparent 60%)`;
   };
@@ -106,114 +106,114 @@ function MotoCard({
     if (glowRef.current) glowRef.current.style.background = 'none';
   };
 
-  const km = (moto.kilometraje ?? 0).toLocaleString('es-CO');
+  const km = (carro.kilometraje ?? 0).toLocaleString('es-CO');
   const anioActual = new Date().getFullYear();
-  const antiguedad = moto.anio ? anioActual - moto.anio : 0;
+  const antiguedad = carro.anio ? anioActual - carro.anio : 0;
 
   return (
     <div
       ref={cardRef}
-      className="moto-card card-enter"
+      className="carro-card card-enter"
       style={{ '--tc': tc.color, '--tc-bg': tc.bg, cursor: 'pointer' } as React.CSSProperties}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
       onMouseMove={handleMove}
-      onClick={() => navigate(`/motos/${moto.id_vehiculo}`)}
+      onClick={() => navigate(`/carros/${carro.id_vehiculo}`)}
     >
       {/* Glow layer */}
-      <div ref={glowRef} className="moto-card-glow" />
+      <div ref={glowRef} className="carro-card-glow" />
 
       {/* Top accent bar */}
-      <div className="moto-card-accent" style={{ background: `linear-gradient(90deg, ${tc.color}, transparent)` }} />
+      <div className="carro-card-accent" style={{ background: `linear-gradient(90deg, ${tc.color}, transparent)` }} />
 
       {/* Header */}
-      <div className="moto-card-header">
+      <div className="carro-card-header">
         {/* Tipo badge */}
-        <div className="moto-tipo-badge" style={{ background: tc.bg, borderColor: `${tc.color}35` }}>
-          <span className="moto-tipo-dot" style={{ background: tc.color }} />
-          <span style={{ color: tc.color }}>{moto.tipo_vehiculo}</span>
+        <div className="carro-tipo-badge" style={{ background: tc.bg, borderColor: `${tc.color}35` }}>
+          <span className="carro-tipo-dot" style={{ background: tc.color }} />
+          <span style={{ color: tc.color }}>{carro.tipo_vehiculo}</span>
         </div>
 
         {/* Acciones — solo para admin/mecánico */}
         {canManage && (
-          <div className="moto-card-actions">
-            <button onClick={e => { e.stopPropagation(); onEdit(moto); }} className="moto-action-btn" title="Editar">
+          <div className="carro-card-actions">
+            <button onClick={e => { e.stopPropagation(); onEdit(carro); }} className="carro-action-btn" title="Editar">
               <Pencil size={12} />
             </button>
-            <button onClick={e => { e.stopPropagation(); onDelete(moto); }} className="moto-action-btn danger" title="Eliminar">
+            {canDelete && (<button onClick={e => { e.stopPropagation(); onDelete(carro); }} className="carro-action-btn danger" title="Eliminar">
               <Trash2 size={12} />
-            </button>
+            </button>)}
           </div>
         )}
       </div>
 
       {/* Photo + Plate + Main info */}
-      <div className="moto-card-body">
-        {imagenMoto(moto) ? (
+      <div className="carro-card-body">
+        {imagenCarro(carro) ? (
           <div style={{ width: '100%', height: 110, borderRadius: 10, overflow: 'hidden', marginBottom: 10, border: `1px solid ${tc.color}20` }}>
-            <img src={imagenMoto(moto)!} alt={`${moto.marca} ${moto.modelo}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <img src={imagenCarro(carro)!} alt={`${carro.marca} ${carro.modelo}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           </div>
         ) : null}
-        <div className="moto-plate-wrap">
-          <span className="plate-tag">{moto.placa}</span>
+        <div className="carro-plate-wrap">
+          <span className="plate-tag">{carro.placa}</span>
         </div>
-        <h3 className="moto-name">
-          {moto.marca} <span className="moto-modelo">{moto.modelo}</span>
+        <h3 className="carro-name">
+          {carro.marca} <span className="carro-modelo">{carro.modelo}</span>
         </h3>
-        {moto.nombre_vehiculo && (
-          <p className="moto-alias">
-            <span className="moto-alias-quote">"</span>{moto.nombre_vehiculo}<span className="moto-alias-quote">"</span>
+        {carro.nombre_vehiculo && (
+          <p className="carro-alias">
+            <span className="carro-alias-quote">"</span>{carro.nombre_vehiculo}<span className="carro-alias-quote">"</span>
           </p>
         )}
       </div>
 
       {/* Stats row */}
-      <div className="moto-stats">
-        <div className="moto-stat-item">
-          <div className="moto-stat-icon" style={{ background: tc.bg }}>
+      <div className="carro-stats">
+        <div className="carro-stat-item">
+          <div className="carro-stat-icon" style={{ background: tc.bg }}>
             <Gauge size={13} style={{ color: tc.color }} />
           </div>
           <div>
-            <p className="moto-stat-val">{moto.modelo}</p>
-            <p className="moto-stat-lbl">Modelo</p>
+            <p className="carro-stat-val">{carro.modelo}</p>
+            <p className="carro-stat-lbl">Modelo</p>
           </div>
         </div>
 
-        <div className="moto-stat-divider" />
+        <div className="carro-stat-divider" />
 
-        <div className="moto-stat-item">
-          <div className="moto-stat-icon" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <div className="carro-stat-item">
+          <div className="carro-stat-icon" style={{ background: 'rgba(255,255,255,0.05)' }}>
             <Zap size={13} className="dark:text-white/40 text-slate-900/40" />
           </div>
           <div>
-            <p className="moto-stat-val">{km}</p>
-            <p className="moto-stat-lbl">km</p>
+            <p className="carro-stat-val">{km}</p>
+            <p className="carro-stat-lbl">km</p>
           </div>
         </div>
 
-        <div className="moto-stat-divider" />
+        <div className="carro-stat-divider" />
 
-        <div className="moto-stat-item">
-          <div className="moto-stat-icon" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <div className="carro-stat-item">
+          <div className="carro-stat-icon" style={{ background: 'rgba(255,255,255,0.05)' }}>
             <Calendar size={13} className="dark:text-white/40 text-slate-900/40" />
           </div>
           <div>
-            <p className="moto-stat-val">{moto.anio}</p>
-            <p className="moto-stat-lbl">{antiguedad === 0 ? 'nuevo' : `${antiguedad}a`}</p>
+            <p className="carro-stat-val">{carro.anio}</p>
+            <p className="carro-stat-lbl">{antiguedad === 0 ? 'nuevo' : `${antiguedad}a`}</p>
           </div>
         </div>
       </div>
 
       {/* Footer owner + diagnostic */}
-      <div className="moto-card-footer">
-        <div className="moto-owner">
-          <div className="moto-owner-avatar">
+      <div className="carro-card-footer">
+        <div className="carro-owner">
+          <div className="carro-owner-avatar">
             <User size={9} />
           </div>
-          <span className="moto-owner-name">{ownerName}</span>
+          <span className="carro-owner-name">{ownerName}</span>
         </div>
         <Link
-          to={`/diagnostico?moto_id=${moto.id_vehiculo}`}
+          to={`/diagnostico?carro_id=${carro.id_vehiculo}`}
           title="Ver / crear diagnóstico"
           onClick={e => e.stopPropagation()}
           style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: 'rgba(59,130,246,0.7)', textDecoration: 'none' }}
@@ -228,27 +228,27 @@ function MotoCard({
 }
 
 /* ═══════════════ MAIN PAGE ═══════════════ */
-export default function MotosPage() {
-  const pageRef  = useRef<HTMLDivElement>(null);
+export default function CarrosPage() {
+  const pageRef = useRef<HTMLDivElement>(null);
   const imgInput = useRef<HTMLInputElement>(null);
-  const toast    = useToast();
+  const toast = useToast();
   const { user: me, isAdmin, isMecanico, isCliente } = useAuth();
 
   /** Admin y mecánico tienen acceso completo (crear/editar/eliminar, ver todo) */
-  const canManage = isAdmin || isMecanico;
+  const canManage = isAdmin || (isMecanico && (me?.permisos?.includes("recepcion") ?? false));
 
-  const [motos,        setMotos]        = useState<Moto[]>([]);
-  const [usuarios,     setUsuarios]     = useState<Usuario[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [saving,       setSaving]       = useState(false);
-  const [search,       setSearch]       = useState('');
-  const [filterTipo,   setFilterTipo]   = useState('');
-  const [modalOpen,    setModalOpen]    = useState(false);
-  const [editTarget,   setEditTarget]   = useState<Moto | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Moto | null>(null);
-  const [imageFile,    setImageFile]    = useState<File | null>(null);
+  const [carros, setCarros] = useState<Carro[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterTipo, setFilterTipo] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Carro | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Carro | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [uploadMsg,    setUploadMsg]    = useState<string | null>(null);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<Form>({
     resolver: zodResolver(schema) as Resolver<Form>,
@@ -257,15 +257,15 @@ export default function MotosPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      if (isCliente && !canManage && me) {
-        // Cliente: solo sus propias motos, sin llamar a la lista completa
-        const { data } = await motosApi.byUser(me.id_usuario);
-        setMotos(data as Moto[]);
+      if (isCliente && !isMecanico && !canManage && me) {
+        // Cliente: solo sus propios carros, sin llamar a la lista completa
+        const { data } = await carrosApi.byUser(me.id_usuario);
+        setCarros(data as Carro[]);
         setUsuarios([me as unknown as Usuario]);
       } else {
-        // Admin / Mecánico: todas las motos y todos los propietarios
-        const [m, u] = await Promise.allSettled([motosApi.list(), usuariosApi.list()]);
-        if (m.status === 'fulfilled') setMotos(m.value.data as Moto[]);
+        // Admin / Mecánico: todas los carros y todos los propietarios
+        const [m, u] = await Promise.allSettled([carrosApi.list(), usuariosApi.list()]);
+        if (m.status === 'fulfilled') setCarros(m.value.data as Carro[]);
         if (u.status === 'fulfilled') setUsuarios(u.value.data as Usuario[]);
       }
     } catch { /* silent */ }
@@ -278,10 +278,10 @@ export default function MotosPage() {
     if (loading) return;
     const ctx = gsap.context(() => {
       const headers = gsap.utils.toArray<HTMLElement>('.mp-header-el');
-      const cards   = gsap.utils.toArray<HTMLElement>('.card-enter');
+      const cards = gsap.utils.toArray<HTMLElement>('.card-enter');
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
       if (headers.length) tl.fromTo(headers, { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, stagger: 0.06 });
-      if (cards.length)   tl.fromTo(cards,   { y: 40, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.08, duration: 0.65, clearProps: 'transform' }, '-=0.3');
+      if (cards.length) tl.fromTo(cards, { y: 40, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, stagger: 0.08, duration: 0.65, clearProps: 'transform' }, '-=0.3');
     }, pageRef);
     return () => ctx.revert();
   }, [loading]);
@@ -293,7 +293,7 @@ export default function MotosPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (m: Moto) => {
+  const openEdit = (m: Carro) => {
     setEditTarget(m);
     setImageFile(null); setImagePreview(null);
     reset({
@@ -306,29 +306,29 @@ export default function MotosPage() {
 
   const onSubmit = async (data: Form) => {
     setSaving(true);
-    /* Capturamos el id de la moto editada UNA sola vez: así una foto SIEMPRE
-       se guarda en la moto correcta, sin importar re-renders o cambios de estado. */
-    const motoIdEditada = editTarget?.id_vehiculo ?? null;
+    /* Capturamos el id del carro editado UNA sola vez: así una foto SIEMPRE
+       se guarda en el carro correcta, sin importar re-renders o cambios de estado. */
+    const carroIdEditada = editTarget?.id_vehiculo ?? null;
     try {
       /* Foto comprimida en el dispositivo (instantáneo, sin servidor) */
       let fotoBase64: string | null = null;
       if (imageFile) {
         try { fotoBase64 = await comprimirImagen(imageFile); } catch { /* se guarda sin foto */ }
       }
-      if (motoIdEditada != null) {
+      if (carroIdEditada != null) {
         /* data NUNCA incluye ruta_imagen_vehiculo (no está en el schema) →
-           editar km/marca/etc. jamás toca la foto de esta ni de otra moto. */
-        await motosApi.update(motoIdEditada, data);
+           editar km/marca/etc. jamás toca la foto de esta ni de otro carro. */
+        await carrosApi.update(carroIdEditada, data);
         if (fotoBase64) {
-          try { await motosApi.update(motoIdEditada, { ruta_imagen_vehiculo: fotoBase64 }); }
+          try { await carrosApi.update(carroIdEditada, { ruta_imagen_vehiculo: fotoBase64 }); }
           catch { toast.error('Datos guardados, pero la foto no (actualiza el backend a columna TEXT).'); }
         }
         toast.success('Vehículo actualizado');
       } else {
-        const { data: nueva } = await motosApi.create(data);
-        const creada = nueva as Moto;
+        const { data: nueva } = await carrosApi.create(data);
+        const creada = nueva as Carro;
         if (fotoBase64 && creada?.id_vehiculo) {
-          try { await motosApi.update(creada.id_vehiculo, { ruta_imagen_vehiculo: fotoBase64 }); }
+          try { await carrosApi.update(creada.id_vehiculo, { ruta_imagen_vehiculo: fotoBase64 }); }
           catch { toast.error('Vehículo creado, pero la foto no se guardó (actualiza el backend a columna TEXT).'); }
         }
         toast.success('Vehículo registrado');
@@ -343,7 +343,7 @@ export default function MotosPage() {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await motosApi.remove(deleteTarget.id_vehiculo);
+      await carrosApi.remove(deleteTarget.id_vehiculo);
       toast.success('Vehículo eliminado');
       setDeleteTarget(null);
       fetchData();
@@ -353,7 +353,7 @@ export default function MotosPage() {
   const ownerName = (id: number) =>
     usuarios.find((u) => u.id_usuario === id)?.nombre_completo ?? '—';
 
-  const filtered = motos.filter((m) => {
+  const filtered = carros.filter((m) => {
     const q = search.toLowerCase();
     const owner = ownerName(m.id_usuario).toLowerCase();
     const matchQ =
@@ -366,8 +366,7 @@ export default function MotosPage() {
   });
 
   /* Stats summary */
-  const totalKm = motos.reduce((a, b) => a + b.kilometraje, 0);
-  const tiposUnicos = [...new Set(motos.map((m) => m.tipo_vehiculo))];
+  const tiposUnicos = [...new Set(carros.map((m) => m.tipo_vehiculo))];
 
   return (
     <div ref={pageRef} className="mp-root">
@@ -389,16 +388,14 @@ export default function MotosPage() {
           </h1>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-3 sm:mt-0">
-          <Button icon={<Plus size={14} />} onClick={openCreate}>
-            {canManage ? 'Nuevo vehículo' : 'Agregar vehículo'}
-          </Button>
+          {canManage && <Button icon={<Plus size={14} />} onClick={openCreate}>Nuevo vehículo</Button>}
         </div>
       </div>
 
       {/* ─── KPI Strip ─── */}
       <div className="mp-kpi-strip mp-header-el">
         <div className="mp-kpi">
-          <span className="mp-kpi-num">{motos.length}</span>
+          <span className="mp-kpi-num">{carros.length}</span>
           <span className="mp-kpi-lbl">Vehículos totales</span>
         </div>
         <div className="mp-kpi-sep" />
@@ -406,11 +403,8 @@ export default function MotosPage() {
           <span className="mp-kpi-num">{tiposUnicos.length}</span>
           <span className="mp-kpi-lbl">Tipos diferentes</span>
         </div>
-        <div className="mp-kpi-sep" />
-        <div className="mp-kpi">
-          <span className="mp-kpi-num">{(totalKm / 1000).toFixed(0)}k</span>
-          <span className="mp-kpi-lbl">Km acumulados</span>
-        </div>
+
+
         <div className="mp-kpi-sep" />
         <div className="mp-kpi">
           <span className="mp-kpi-num">{usuarios.length}</span>
@@ -467,7 +461,7 @@ export default function MotosPage() {
                 <p className="mp-empty-sub">
                   {search || filterTipo ? 'Intenta con otro filtro' : 'Agrega el primer vehículo de la flota'}
                 </p>
-                {!search && !filterTipo && (
+                {canManage && !search && !filterTipo && (
                   <button onClick={openCreate} className="mp-empty-cta">
                     <Plus size={14} /> Registrar primer vehículo
                   </button>
@@ -475,14 +469,15 @@ export default function MotosPage() {
               </div>
             )
             : filtered.map((m, i) => (
-              <MotoCard
+              <CarroCard
                 key={m.id_vehiculo}
-                moto={m}
+                carro={m}
                 ownerName={ownerName(m.id_usuario)}
                 onEdit={openEdit}
                 onDelete={setDeleteTarget}
                 index={i}
                 canManage={canManage}
+                canDelete={isAdmin}
               />
             ))
         }
@@ -503,13 +498,13 @@ export default function MotosPage() {
               </span>
             )}
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button form="moto-form" type="submit" loading={saving}>
+            <Button form="carro-form" type="submit" loading={saving}>
               {editTarget ? 'Guardar cambios' : 'Registrar vehículo'}
             </Button>
           </>
         }
       >
-        <form id="moto-form" onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <form id="carro-form" onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
 
           {/* Aviso de privacidad — solo al crear, no al editar */}
           {!editTarget && (
@@ -550,7 +545,7 @@ export default function MotosPage() {
           </datalist>
           <Input label='Nombre del vehículo (opcional)' placeholder='"La Bestia"' {...register('nombre_vehiculo')} />
 
-          {/* Foto de la moto */}
+          {/* Foto del carro */}
           <div>
             <label className="text-sm font-medium dark:text-white/70 text-slate-900/70 block mb-1.5">
               Foto del vehículo <span className="dark:text-white/25 text-slate-900/25 text-xs font-normal">(opcional)</span>
@@ -562,19 +557,19 @@ export default function MotosPage() {
               onKeyDown={e => e.key === 'Enter' && imgInput.current?.click()}
               className="relative border-2 border-dashed rounded-xl overflow-hidden cursor-pointer transition-all duration-200 focus:outline-none"
               style={{
-                borderColor: imagePreview || (editTarget && imagenMoto(editTarget)) ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.1)',
+                borderColor: imagePreview || (editTarget && imagenCarro(editTarget)) ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.1)',
                 background: 'rgba(255,255,255,0.02)',
               }}
             >
-              {imagePreview || (editTarget && imagenMoto(editTarget)) ? (
+              {imagePreview || (editTarget && imagenCarro(editTarget)) ? (
                 <div className="relative">
                   <img
-                    src={imagePreview ?? (editTarget ? imagenMoto(editTarget) ?? '' : '')}
+                    src={imagePreview ?? (editTarget ? imagenCarro(editTarget) ?? '' : '')}
                     alt="Preview"
                     className="w-full h-40 object-cover block"
                   />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200"
-                       style={{ background: 'rgba(0,0,0,0.55)' }}>
+                    style={{ background: 'rgba(0,0,0,0.55)' }}>
                     <p className="dark:text-white text-slate-900 text-xs font-bold tracking-wider uppercase">Cambiar foto</p>
                   </div>
                 </div>
@@ -642,7 +637,7 @@ export default function MotosPage() {
               <>
                 <input type="hidden" value={me?.id_usuario ?? 0} {...register('id_usuario')} />
                 <div className="gm-input-d flex items-center gap-2 dark:text-white/50 text-slate-900/50 cursor-not-allowed select-none"
-                     style={{ opacity: 0.7 }}>
+                  style={{ opacity: 0.7 }}>
                   <User size={13} />
                   <span>{me?.nombre_completo} (tu cuenta)</span>
                 </div>

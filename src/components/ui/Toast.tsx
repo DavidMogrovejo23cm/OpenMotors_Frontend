@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Toast notification system
+   OpenMotors — Toast notification system
    ───────────────────────────────────────────── */
 
 import {

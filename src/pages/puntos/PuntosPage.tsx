@@ -1,14 +1,14 @@
 /* ─────────────────────────────────────────────
-   GMotors — Sistema de Gamificación / Puntos
+   OpenMotors — Sistema de Gamificación / Puntos
    Puntos por servicio según cilindraje
    100 puntos = USD 5 de descuento (cashback)
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useMemo } from 'react';
 import { Star, Gift, Trophy, Zap, Award, Users, Fuel } from 'lucide-react';
-import { registrosApi, motosApi, usuariosApi, combustibleApi } from '../../lib/api';
+import { registrosApi, carrosApi, usuariosApi, combustibleApi } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import type { RegistroDetalle, Moto, Usuario } from '../../types';
+import type { RegistroDetalle, Carro, Usuario } from '../../types';
 import { fmtDate, fmtMoney, toIsoStr } from '../../lib/utils';
 import { puntosCanjeadosEnRegistros } from '../../lib/puntos';
 
@@ -53,7 +53,7 @@ function nextLevel(pts: number) {
 interface HistItem {
   id_registro: number;
   fecha: string;
-  moto: string;
+  carro: string;
   placa: string;
   tipo: string;
   pts: number;
@@ -63,7 +63,7 @@ interface HistItem {
 
 interface UserPoints {
   usuario: Usuario;
-  motos: Moto[];
+  carros: Carro[];
   historia: HistItem[];
   totales: number;
   canjeados: number;
@@ -80,21 +80,21 @@ export default function PuntosPage() {
   useEffect(() => {
     async function load() {
       const [rr, mr, ur, cr] = await Promise.allSettled([
-        registrosApi.list(), motosApi.list(), usuariosApi.list(), combustibleApi.list(),
+        registrosApi.list(), carrosApi.list(), usuariosApi.list(), combustibleApi.list(),
       ]);
       const records: RegistroDetalle[] = rr.status === 'fulfilled' ? rr.value.data : [];
-      const motos:   Moto[]            = mr.status === 'fulfilled' ? mr.value.data : [];
+      const carros:   Carro[]            = mr.status === 'fulfilled' ? mr.value.data : [];
       const users:   Usuario[]         = ur.status === 'fulfilled' ? ur.value.data : [];
       const cargasAll: import('../../types').CargaCombustible[] = cr.status === 'fulfilled' ? cr.value.data : [];
 
-      const motoMap = new Map(motos.map(m => [m.placa, m]));
+      const carroMap = new Map(carros.map(m => [m.placa, m]));
 
       /* Calcular puntos por usuario cliente */
       const clienteUsers = (isAdmin || isMecanico) ? users : users.filter(u => u.id_usuario === user?.id_usuario);
 
       const userPoints: UserPoints[] = clienteUsers.map(u => {
-        const userMotos = motos.filter(m => m.id_usuario === u.id_usuario);
-        const userPlacas = new Set(userMotos.map(m => m.placa));
+        const userCarros = carros.filter(m => m.id_usuario === u.id_usuario);
+        const userPlacas = new Set(userCarros.map(m => m.placa));
 
         const userRecords = records.filter(r =>
           (r.id_cliente != null && r.id_cliente === u.id_usuario) || userPlacas.has(r.placa)
@@ -102,14 +102,14 @@ export default function PuntosPage() {
 
         const historia: HistItem[] = userRecords
           .map(r => {
-            const moto   = motoMap.get(r.placa);
-            const cc     = moto?.cilindraje ?? 125;
+            const carro   = carroMap.get(r.placa);
+            const cc     = carro?.cilindraje ?? 125;
             const pts    = ptsForCc(cc);
             const bono   = isOilChange(r.tipo_servicio ?? '', r.descripcion ?? '') ? 3 : 0;
             return {
               id_registro: r.id_registro,
               fecha:       r.fecha,
-              moto:        `${r.marca_vehiculo} ${r.modelo_vehiculo}`,
+              carro:        `${r.marca_vehiculo} ${r.modelo_vehiculo}`,
               placa:       r.placa,
               tipo:        r.tipo_servicio ?? '—',
               pts,
@@ -121,14 +121,14 @@ export default function PuntosPage() {
 
         const totalesServicio = historia.reduce((s, h) => s + h.total, 0);
         // Puntos por combustible: 2 pts por cada día único con carga
-        const placasSet = new Set(userMotos.map(m => m.placa));
+        const placasSet = new Set(userCarros.map(m => m.placa));
         const cargasUser = cargasAll.filter(c => placasSet.has(c.placa));
         const diasUnicos = new Set(cargasUser.map(c => String(c.fecha).slice(0, 10)));
         const ptsCombustible = diasUnicos.size * 2;
         const bonus = Number(u.puntosBonus ?? 0);
         const totales = totalesServicio + ptsCombustible + bonus;
         const canjeados = puntosCanjeadosEnRegistros(userRecords);
-        return { usuario: u, motos: userMotos, historia, totales, canjeados, ptsCombustible };
+        return { usuario: u, carros: userCarros, historia, totales, canjeados, ptsCombustible };
       });
 
       userPoints.sort((a, b) => (b.totales - b.canjeados) - (a.totales - a.canjeados));
@@ -161,7 +161,7 @@ export default function PuntosPage() {
         <div className="flex items-center gap-2 mb-1">
           <Star size={13} className="text-gm-red/60" />
           <span className="text-[10px] tracking-[0.3em] uppercase dark:text-white/28 text-slate-900/28 font-bold">
-            Open Motors · Puntos
+            OpenMotors · Puntos
           </span>
         </div>
         <h1 className="text-[2rem] font-black dark:text-white text-slate-900 leading-tight tracking-tight">
@@ -289,14 +289,14 @@ export default function PuntosPage() {
                 </div>
               ))}
 
-              {/* Motos del cliente */}
+              {/* Carros del cliente */}
               <div className="sm:col-span-4 gm-card-d rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Trophy size={13} className="text-gm-red/60" />
-                  <p className="text-[10px] tracking-[0.3em] uppercase dark:text-white/28 text-slate-900/28 font-bold">Motos registradas</p>
+                  <p className="text-[10px] tracking-[0.3em] uppercase dark:text-white/28 text-slate-900/28 font-bold">Carros registrados</p>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {selected.motos.map(m => {
+                  {selected.carros.map(m => {
                     const cc  = m.cilindraje;
                     const pts = ptsForCc(cc);
                     const row = POINTS_TABLE.find(r => cc <= r.max);
@@ -311,8 +311,8 @@ export default function PuntosPage() {
                       </div>
                     );
                   })}
-                  {selected.motos.length === 0 && (
-                    <p className="dark:text-white/25 text-slate-900/25 text-sm col-span-4">Sin motos registradas</p>
+                  {selected.carros.length === 0 && (
+                    <p className="dark:text-white/25 text-slate-900/25 text-sm col-span-4">Sin carros registrados</p>
                   )}
                 </div>
               </div>
@@ -340,7 +340,7 @@ export default function PuntosPage() {
                   <thead>
                     <tr>
                       <th>Fecha</th>
-                      <th>Moto</th>
+                      <th>Carro</th>
                       <th>Servicio</th>
                       <th className="text-right">Pts base</th>
                       <th className="text-right">Bono aceite</th>
@@ -353,7 +353,7 @@ export default function PuntosPage() {
                         <td className="dark:text-white/50 text-slate-900/50 text-[12px]">{fmtDate(h.fecha)}</td>
                         <td>
                           <span className="plate-tag">{h.placa}</span>
-                          <span className="dark:text-white/45 text-slate-900/45 text-xs ml-2">{h.moto}</span>
+                          <span className="dark:text-white/45 text-slate-900/45 text-xs ml-2">{h.carro}</span>
                         </td>
                         <td className="dark:text-white/65 text-slate-900/65 text-[13px]">{h.tipo}</td>
                         <td className="text-right text-yellow-400 font-bold">+{h.pts}</td>

@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Custom GSAP hooks
+   OpenMotors — Custom GSAP hooks
    ───────────────────────────────────────────── */
 
 import { useEffect, useRef } from 'react';

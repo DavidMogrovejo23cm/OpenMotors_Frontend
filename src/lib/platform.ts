@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Detección de plataforma
+   OpenMotors — Detección de plataforma
    Permite servir una UI distinta en el APK (nativo) sin tocar la web.
    ───────────────────────────────────────────── */
 import { Capacitor } from '@capacitor/core';

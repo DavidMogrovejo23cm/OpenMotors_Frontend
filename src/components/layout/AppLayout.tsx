@@ -1,5 +1,6 @@
+import { canAccessModulo } from '../../lib/utils';
 /* ─────────────────────────────────────────────
-   OPEN MOTORS — App Layout Premium
+   OPENMOTORS — App Layout Premium
    Logo · Nav · Hamburger mobile · Dropdown
    ───────────────────────────────────────────── */
 
@@ -9,7 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, ChevronDown, Menu, X, KeyRound, Download } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { initials, parsePermisos, getErrorMsg } from '../../lib/utils';
+import { initials, getErrorMsg, cn } from '../../lib/utils';
 import { NotificationBell, NotificationPanel } from '../ui/NotificationCenter';
 import { useNotifications } from '../../hooks/useNotifications';
 import { healthApi, usuariosApi, authApi } from '../../lib/api';
@@ -29,11 +30,20 @@ export default function AppLayout() {
   const location  = useLocation();
   const navigate  = useNavigate();
   const lastNonClientRoute = useRef("/dashboard");
+  const mainRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     if (location.pathname !== "/clientes") {
       lastNonClientRoute.current = location.pathname + location.search + location.hash;
     }
   }, [location.pathname, location.search, location.hash]);
+
+  /* Resetear scroll del contenido al cambiar de módulo/ruta */
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [location.pathname]);
   const toast      = useToast();
   const { unread } = useNotifications();
   const [theme] = useTheme();
@@ -89,42 +99,35 @@ export default function AppLayout() {
   const [moreOpen, setMoreOpen]         = useState(false);
   const moreRef                         = useRef<HTMLDivElement>(null);
 
-  const hour      = new Date().getHours();
-  const greeting  = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
-  const firstName = user?.nombre_completo?.split(' ')[0] ?? 'Usuario';
   const roleLabel = isAdmin ? 'Administrador' : isMecanico ? 'Mecánico' : isCliente ? 'Cliente' : 'Sin rol';
   const roleColor = isAdmin ? '#E11428' : isMecanico ? '#3B82F6' : isCliente ? '#10B981' : '#8B8FA8';
   const isDark    = theme === 'dark';
-  const topText   = isDark ? 'rgba(255,255,255,0.38)'  : 'rgba(22,22,26,0.50)';
-  const topTextHi = isDark ? 'rgba(255,255,255,0.80)'  : 'rgba(22,22,26,0.90)';
-  const topBtnBg  = isDark ? 'rgba(255,255,255,0.05)'  : 'rgba(0,0,0,0.05)';
-  const topBtnBdr = isDark ? 'rgba(255,255,255,0.08)'  : 'rgba(0,0,0,0.10)';
 
   /* Permisos de módulos (mecánicos): null = sin restricción, array = lista permitida */
-  const mecPermisos = isMecanico ? parsePermisos(user?.descripcion) : null;
-  const puede = (mod: string) =>
-    isAdmin || !isMecanico || !mecPermisos || mecPermisos.includes(mod);
+  const puede = (mod: string) => canAccessModulo(user?.permisos, mod, isAdmin, isMecanico);
 
   /* Vista de cliente: cualquiera que NO sea admin ni mecánico (incluye usuarios
      SIN rol asignado). Garantiza que nunca vean módulos internos del taller. */
   const verCliente = !isAdmin && !isMecanico;
 
-  /* Navegación principal — limpia. Diagnóstico y Metodología viven DENTRO de Motos.
+  /* Navegación principal — limpia. Diagnóstico y Metodología viven DENTRO de Carros.
      Combustible y Alertas van en el menú "Más" para no saturar la barra. */
   const NAV = [
     { label: 'Dashboard',    to: '/dashboard'    },
     ...(puede('registros')   && (isAdmin || isMecanico) ? [{ label: 'Registros',   to: '/registros'   }] : []),
-    ...(puede('motos')       && (isAdmin || isMecanico) ? [{ label: 'Vehículos',       to: '/motos'       }] : []),
+    ...(puede('carros')       && (isAdmin || isMecanico) ? [{ label: 'Vehículos',       to: '/carros'       }] : []),
     ...(puede('inventario')  && (isAdmin || isMecanico) ? [{ label: 'Inventario',  to: '/inventario'  }] : []),
     ...(puede('proveedores') && (isAdmin || isMecanico) ? [{ label: 'Proveedores', to: '/proveedores' }] : []),
     ...(puede('clientes')    && (isAdmin || isMecanico) ? [{ label: 'Clientes',    to: '/clientes'    }] : []),
     ...(isAdmin                                         ? [{ label: 'Pagos',       to: '/pagos'       }] : []),
-    ...(verCliente                                      ? [{ label: 'Mis vehículos',     to: '/mi-moto'     }] : []),
+    ...(verCliente                                      ? [{ label: 'Mis vehículos',     to: '/mi-carro'     }] : []),
     ...(verCliente                                      ? [{ label: 'Mi Portal',   to: '/portal'      }] : []),
   ];
 
   /* Menú "Más" — secundarios, no saturan la barra principal */
   const NAV_MORE = [
+    ...(isAdmin || isMecanico ? [{ label: 'Herramientas', to: '/herramientas' }] : []),
+    ...(isAdmin || isMecanico ? [{ label: 'Personal',     to: '/personal'     }] : []),
     ...(isAdmin                                         ? [{ label: 'Contabilidad', to: '/contabilidad'  }] : []),
     ...(isAdmin                                         ? [{ label: 'Perfiles',     to: '/perfiles'      }] : []),
   ];
@@ -171,7 +174,7 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <div className="gm-app-bg flex flex-col min-h-screen">
+    <div className="gm-app-bg flex flex-col h-screen h-[100dvh] overflow-hidden">
 
       {/* ══ MENÚ "MÁS" PREMIUM — solo APK ══ */}
       {isNativeApp && (
@@ -222,7 +225,7 @@ export default function AppLayout() {
                 <Link to="/dashboard" className="flex items-center gap-2.5" onClick={() => setMobileOpen(false)}>
                   <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 bg-white p-0.5"
                        style={{ boxShadow: '0 0 0 1.5px rgba(225,20,40,0.4)' }}>
-                    <img src="/brand/open-motor-logo.png" alt="Open Motors" className="w-full h-full object-contain" />
+                    <img src="/brand/open-motor-logo.png" alt="OpenMotors" className="w-full h-full object-contain" />
                   </div>
                   <span className="font-black leading-none text-xl"
                         style={{ color: isDark ? '#fff' : '#16161A' }}>
@@ -319,217 +322,150 @@ export default function AppLayout() {
 
       {/* ══ TOPBAR ══════════════════════════════════════════════════ */}
       <header
-        className="gm-topbar sticky top-0 z-50 flex-none"
+        className="gm-topbar sticky top-0 z-50 flex-none bg-white/95 dark:bg-[#0c0f17]/95 border-b border-slate-200/80 dark:border-slate-800/80"
         style={{ 
           backdropFilter: 'blur(16px)', 
           WebkitBackdropFilter: 'blur(16px)',
           paddingTop: isNativeApp ? 'env(safe-area-inset-top, 34px)' : undefined
         }}
       >
-        <div className="flex items-center gap-3 px-4 lg:px-10 h-[62px] max-w-screen-2xl mx-auto">
+        <div className="flex items-center justify-between gap-4 px-4 lg:px-6 h-[52px]">
 
-          {/* Hamburger — solo mobile */}
-          <button
-            className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl shrink-0 transition-all"
-            style={{ background: topBtnBg, border: `1px solid ${topBtnBdr}` }}
-            onClick={() => setMobileOpen(true)}
-            aria-label="Abrir menú"
-          >
-            <Menu size={18} style={{ color: topTextHi }} />
-          </button>
-
-          {/* Topbar Brand & Toggle */}
-          <Link to="/dashboard" className="gallery-brand flex items-center gap-2 min-w-0">
-            <div
-              className="relative shrink-0 overflow-hidden bg-white p-0.5"
-              style={{
-                width: 44, height: 44, borderRadius: 10,
-                boxShadow: '0 0 0 2px rgba(30,58,138,0.2), 0 4px 14px rgba(30,58,138,0.15)',
-                transition: 'box-shadow 200ms',
-              }}
+          {/* Left: Mobile Toggle & Brand */}
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Hamburger — solo mobile */}
+            <button
+              className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Abrir menú"
             >
-              <img src="/brand/open-motor-logo.png" alt="Open Motors" className="w-full h-full object-contain" />
-            </div>
-            <span className="truncate">Open Motors</span>
-          </Link>
+              <Menu size={18} />
+            </button>
 
-          {/* Divisor desktop */}
-          <div className="hidden lg:block w-px h-8 bg-white/[0.06] shrink-0" />
+            {/* Brand Logo & Name */}
+            <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0 group">
+              <div className="w-7 h-7 rounded-lg overflow-hidden bg-white shrink-0 border border-slate-200/90 dark:border-slate-700/80 p-0.5 shadow-xs">
+                <img src="/brand/open-motor-logo.png" alt="OpenMotors" className="w-full h-full object-contain" />
+              </div>
+              <span className="font-bold text-[15px] tracking-tight text-slate-900 dark:text-white leading-none">
+                Open<span className="text-[#D62828]">Motors</span>
+              </span>
+            </Link>
+          </div>
 
-          {/* Nav horizontal simplificado / enlaces rápidos en desktop */}
-          <nav className="hidden lg:flex items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar pl-2">
-            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-2">
-              Taller Automotriz
-            </span>
-          </nav>
-
-          {/* Menú "Más" — FUERA del <nav> (el overflow del nav recortaba el desplegable) */}
-          {NAV_MORE.length > 0 && (
-            <div className="relative hidden md:block shrink-0" ref={moreRef}>
-              <button
-                onClick={() => setMoreOpen(v => !v)}
-                className="relative flex items-center gap-1 px-3 py-2 rounded-lg text-[11.5px] font-bold tracking-[0.12em] uppercase transition-all duration-150"
-                style={{
-                  color: moreOpen ? (isDark ? '#fff' : '#16161A') : topText,
-                  background: moreOpen ? topBtnBg : 'transparent',
-                }}
-              >
-                Más <ChevronDown size={12} style={{ transform: moreOpen ? 'rotate(180deg)' : '', transition: 'transform 180ms' }} />
-              </button>
-              {moreOpen && (
-                <div
-                  className="absolute right-0 top-full mt-2 w-48 rounded-xl overflow-hidden z-[60] py-1"
-                  style={{
-                    background: isDark ? 'linear-gradient(150deg, #1E1E28 0%, #16161E 100%)' : '#FFFFFF',
-                    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E4E7EC',
-                    boxShadow: isDark ? '0 16px 48px rgba(0,0,0,0.6)' : '0 16px 48px rgba(0,0,0,0.12)',
-                  }}
-                >
-                  {NAV_MORE.map(({ label, to }) => {
-                    const active = location.pathname === to || location.pathname.startsWith(to + '/');
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => setMoreOpen(false)}
-                        className="block px-4 py-2.5 text-[12px] font-bold tracking-[0.08em] uppercase transition-colors"
-                        style={{ color: active ? '#FF6470' : (isDark ? 'rgba(255,255,255,0.55)' : 'rgba(21,21,27,0.6)'), background: active ? 'rgba(225,20,40,0.1)' : 'transparent' }}
-                        onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'; }}
-                        onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                      >
-                        {label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Derecha: notif + saludo + avatar */}
-          <div className="flex items-center gap-2 ml-auto shrink-0" ref={menuRef}>
+          {/* Right: Actions & User */}
+          <div className="flex items-center gap-2 shrink-0">
             {/* PWA Install */}
             {deferredPrompt && (
+              <button
+                onClick={() => {
+                  deferredPrompt.prompt();
+                  deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#D62828] text-white hover:bg-[#b81d1d] transition-colors shadow-xs"
+                title="Instalar OpenMotors"
+              >
+                <Download size={13} />
+                <span>Instalar</span>
+              </button>
+            )}
+
+            {/* Menú "Más" secundario */}
+            {NAV_MORE.length > 0 && (
+              <div className="relative hidden md:block" ref={moreRef}>
                 <button
-                  onClick={() => {
-                    deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs shadow-md transition-all hover:scale-105 active:scale-95"
-                  style={{ background: '#E11428', color: '#FFF' }}
-                  title="Instalar Open Motors"
+                  onClick={() => setMoreOpen(v => !v)}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                    moreOpen
+                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60"
+                  )}
                 >
-                  <Download size={14} />
-                  Instalar
+                  <span>Más</span>
+                  <ChevronDown size={12} className={cn("transition-transform duration-150", moreOpen && "rotate-180")} />
                 </button>
-              )}
+                {moreOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-1.5 w-44 rounded-xl overflow-hidden z-[60] py-1 bg-white dark:bg-[#16161E] border border-slate-200 dark:border-slate-800 shadow-lg"
+                  >
+                    {NAV_MORE.map(({ label, to }) => {
+                      const active = location.pathname === to || location.pathname.startsWith(to + '/');
+                      return (
+                        <Link
+                          key={to}
+                          to={to}
+                          onClick={() => setMoreOpen(false)}
+                          className={cn(
+                            "block px-3 py-2 text-[12px] font-medium transition-colors",
+                            active
+                              ? "bg-red-50 text-[#D62828] dark:bg-red-950/30 dark:text-red-400 font-semibold"
+                              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                          )}
+                        >
+                          {label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bell de notificaciones */}
             <div className="relative" ref={notifRef}>
               <NotificationBell onClick={() => setNotifOpen(v => !v)} unread={unread} />
               <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
             </div>
-            <div className="hidden lg:block text-right">
-              <p className="text-[12px] font-semibold leading-snug" style={{ color: topText }}>
-                {greeting}, <span style={{ color: topTextHi, fontWeight:700 }}>{firstName}</span>
-              </p>
-              <p className="text-[12px] font-bold tracking-[0.12em] uppercase" style={{ color: roleColor }}>
-                {roleLabel}
-              </p>
-            </div>
 
-            {/* Punto online — visible en md+ */}
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full border"
-                 style={{ background:'rgba(16,185,129,0.07)', borderColor:'rgba(16,185,129,0.2)' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"
-                    style={{ boxShadow:'0 0 6px rgba(52,211,153,0.9)' }} />
-              <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-emerald-400/70">Online</span>
-            </div>
+            {/* Divisor vertical sutil */}
+            <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5 hidden sm:block" />
 
             {/* Avatar con dropdown */}
-            <div className="relative">
+            <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
-                style={{
-                  background: open ? `${roleColor}22` : topBtnBg,
-                  border: `1px solid ${open ? roleColor + '40' : topBtnBdr}`,
-                }}
+                className="flex items-center gap-1.5 p-0.5 rounded-full hover:ring-2 hover:ring-slate-200 dark:hover:ring-slate-700 transition-all cursor-pointer"
+                aria-label="Menú de usuario"
               >
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-black"
-                  style={{ background:`${roleColor}22`, color:roleColor }}
-                >
+                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs">
                   {initials(user?.nombre_completo ?? 'U')}
                 </div>
-                <ChevronDown size={12} style={{ color: topText, transform: open ? 'rotate(180deg)' : '', transition:'transform 200ms' }} />
               </button>
 
               {open && (
                 <div
-                  className="absolute right-0 top-full mt-2 w-60 rounded-2xl overflow-hidden z-50"
-                  style={{
-                    background: isDark ? 'linear-gradient(150deg, #1E1E28 0%, #16161E 100%)' : '#FFFFFF',
-                    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E4E7EC',
-                    boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)' : '0 24px 60px rgba(0,0,0,0.12)',
-                  }}
+                  className="absolute right-0 top-full mt-2 w-56 rounded-xl overflow-hidden z-50 bg-white dark:bg-[#16161E] border border-slate-200 dark:border-slate-800 shadow-xl"
                 >
-                  {/* Header usuario */}
-                  <div className="p-4 border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#E4E7EC' }}>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-[13px] font-black"
-                        style={{ background:`${roleColor}22`, color:roleColor, border:`1.5px solid ${roleColor}35` }}
-                      >
-                        {initials(user?.nombre_completo ?? 'U')}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-black dark:text-white/90 text-slate-900/90 truncate">{user?.nombre_completo}</p>
-                        <p className="text-[11px] dark:text-white/35 text-slate-900/35 truncate">{user?.correo}</p>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span
-                        className="text-[10px] font-black tracking-[0.18em] uppercase px-2 py-0.5 rounded-full"
-                        style={{ background:`${roleColor}18`, color:roleColor, border:`1px solid ${roleColor}30` }}
-                      >
+                  {/* Info usuario */}
+                  <div className="p-3 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40">
+                    <p className="text-[13px] font-semibold text-slate-900 dark:text-white truncate">
+                      {user?.nombre_completo}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {user?.correo}
+                    </p>
+                    <div className="mt-1.5">
+                      <span className="inline-block text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                         {roleLabel}
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px] text-emerald-400/60 font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.8)]" />
-                        En línea
                       </span>
                     </div>
                   </div>
 
                   {/* Acciones de cuenta */}
-                  <div className="p-2 space-y-1">
+                  <div className="p-1 space-y-0.5">
                     <button
                       onClick={() => { setPwOpen(true); setOpen(false); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold transition-all dark:text-white/70 text-slate-900/70"
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
                     >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10 border border-blue-500/20">
-                        <KeyRound size={14} className="text-blue-400" />
-                      </div>
-                      Crear / cambiar contraseña
+                      <KeyRound size={14} className="text-slate-400" />
+                      Cambiar contraseña
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold transition-all"
-                      style={{ color:'rgba(248,113,113,0.8)' }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)';
-                        (e.currentTarget as HTMLElement).style.color = 'rgb(248,113,113)';
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = '';
-                        (e.currentTarget as HTMLElement).style.color = 'rgba(248,113,113,0.8)';
-                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                     >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-500/10 border border-red-500/20">
-                        <LogOut size={14} className="text-red-400" />
-                      </div>
+                      <LogOut size={14} className="text-red-500" />
                       Cerrar sesión
                     </button>
                   </div>
@@ -541,7 +477,7 @@ export default function AppLayout() {
       </header>
 
       {/* ══ CUERPO PRINCIPAL CON SIDEBAR LATERAL ══ */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
         {/* Sidebar Lateral en Desktop */}
         <Sidebar
           collapsed={sidebarCollapsed}
@@ -549,13 +485,13 @@ export default function AppLayout() {
         />
 
         {/* ══ CONTENIDO DE CADA PÁGINA ════════════════════════════════ */}
-        <main className="gallery-content flex-1 min-w-0 overflow-y-auto min-h-[calc(100vh-62px)]">
+        <main ref={mainRef} className="gallery-content flex-1 min-w-0 overflow-y-auto h-full">
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-            className="p-4 md:p-6 lg:p-8 max-w-screen-2xl mx-auto"
+            className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full"
             style={{ paddingBottom: isNativeApp ? 120 : undefined }}
           >
             {/* Boundary por página: si una pantalla falla, el menú sigue vivo
@@ -573,7 +509,7 @@ export default function AppLayout() {
       {/* ══ BOTÓN FLOTANTE WHATSAPP — solo en web ══ */}
       {!isNativeApp && (
         <a
-          href={whatsappCitaLink('Hola! Quiero agendar una cita en Open Motors 🚗')}
+          href={whatsappCitaLink('Hola! Quiero agendar una cita en OpenMotors 🚗')}
           target="_blank"
           rel="noopener noreferrer"
           className="fixed z-50 flex items-center justify-center rounded-full shadow-2xl transition-transform hover:scale-110 active:scale-95"

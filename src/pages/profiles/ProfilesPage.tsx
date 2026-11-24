@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Panel de Administración v2
+   OpenMotors — Panel de Administración v2
    Design premium · framer-motion · multi-rol
    ───────────────────────────────────────────── */
 
@@ -9,14 +9,14 @@ import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   Search, Shield, Users, Mail, MapPin, UserPlus,
   ChevronRight, Wrench, Crown, User, X,
-  Lock, Zap, Star, Activity, Trash2,
+  Lock, Zap, Star, Activity, Trash2, Ban, CheckCircle, KeyRound,
 } from "lucide-react";
-import { usuariosApi, rolesApi, motosApi } from "../../lib/api";
+import { usuariosApi, rolesApi, carrosApi } from "../../lib/api";
 import { useTheme } from "../../lib/theme";
 import { useToast } from "../../components/ui/Toast";
 import { useAuth } from "../../contexts/AuthContext";
-import { initials, extractCedula, getErrorMsg, parsePermisos, setPermisos } from "../../lib/utils";
-import type { Usuario, Rol, Moto } from "../../types";
+import { initials, extractCedula, getErrorMsg } from "../../lib/utils";
+import type { Usuario, Rol, Carro } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { Car, Gauge } from "lucide-react";
 import Button from "../../components/ui/Button";
@@ -46,11 +46,9 @@ function getRolName(roles: unknown[]): string {
 
 /* ── Módulos configurables para mecánicos ── */
 const MECANICO_MODULES = [
-  { key: 'registros',   label: 'Registros',   desc: 'Órdenes de servicio' },
-  { key: 'motos',       label: 'Vehículos',        desc: 'Diagnósticos y perfiles' },
-  { key: 'inventario',  label: 'Inventario',   desc: 'Productos y stock' },
-  { key: 'proveedores', label: 'Proveedores',  desc: 'Gestión de proveedores' },
-  { key: 'clientes',    label: 'Clientes',     desc: 'Historial de clientes' },
+  { key: 'recepcion', label: 'Recepción', desc: 'Registrar clientes y carros' },
+  { key: 'inventario_entradas', label: 'Productos y entradas', desc: 'Gestionar inventario y proveedores' },
+  { key: 'inventario_consumos', label: 'Consumo de repuestos', desc: 'Solo en sus órdenes asignadas' },
 ];
 
 /* ── Constantes de roles ── */
@@ -104,13 +102,15 @@ function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg"
 }
 
 /* ── Tarjeta de usuario premium ── */
-function UserCard({ u, roleName, onAssign, onDelete, onView, motosCount = 0 }: {
+function UserCard({ u, roleName, onAssign, onToggleActivo, onResetPwd, onDelete, onView, carrosCount = 0 }: {
   u: Usuario; roleName: string; onAssign: (u: Usuario) => void;
-  onDelete?: (u: Usuario) => void; onView?: (u: Usuario) => void; motosCount?: number;
+  onToggleActivo?: (u: Usuario) => void; onResetPwd?: (u: Usuario) => void;
+  onDelete?: (u: Usuario) => void; onView?: (u: Usuario) => void; carrosCount?: number;
 }) {
   const [theme] = useTheme();
   const isDark = theme === 'dark';
   const isProtected = u.correo === 'OpenMotors2026@gmail.com';
+  const isActivo = u.activo !== false;
   const tab    = TABS.find(t => t.key === roleName);
   const color  = tab?.color ?? "#8B8FA8";
   const cedula = extractCedula(u.descripcion);
@@ -162,11 +162,16 @@ function UserCard({ u, roleName, onAssign, onDelete, onView, motosCount = 0 }: {
               </p>
               <p className="text-[11px] dark:text-white/28 text-slate-900/28 mt-0.5">@{u.nombre_usuario}</p>
               {tab && (
-                <div className="mt-1.5 flex items-center gap-1.5">
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                   <tab.icon size={9} style={{ color }} />
                   <span className="text-[10px] font-black tracking-wider uppercase" style={{ color }}>
                     {tab.label.replace(/s$/, "")}
                   </span>
+                  {!isActivo && (
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                      Suspendida
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -196,10 +201,10 @@ function UserCard({ u, roleName, onAssign, onDelete, onView, motosCount = 0 }: {
                 <span>{phone}</span>
               </div>
             )}
-            {motosCount > 0 && (
+            {carrosCount > 0 && (
               <div className="flex items-center gap-2 text-[12px]" style={{ color }}>
                 <Car size={10} className="shrink-0" style={{ opacity: 0.7 }} />
-                <span className="font-bold">{motosCount} vehículo{motosCount !== 1 ? "s" : ""} registrado{motosCount !== 1 ? "s" : ""}</span>
+                <span className="font-bold">{carrosCount} vehículo{carrosCount !== 1 ? "s" : ""} registrado{carrosCount !== 1 ? "s" : ""}</span>
               </div>
             )}
           </div>
@@ -237,6 +242,24 @@ function UserCard({ u, roleName, onAssign, onDelete, onView, motosCount = 0 }: {
                 >
                   Ver ficha <ChevronRight size={10} />
                 </Link>
+              )}
+              {onResetPwd && (
+                <button
+                  onClick={() => onResetPwd(u)}
+                  className="flex items-center gap-1 text-[11px] font-bold dark:text-white/30 text-slate-900/35 hover:text-amber-400 transition-colors duration-150"
+                  title="Restablecer contraseña"
+                >
+                  <KeyRound size={11} />
+                </button>
+              )}
+              {onToggleActivo && !isProtected && (
+                <button
+                  onClick={() => onToggleActivo(u)}
+                  className={`flex items-center gap-1 text-[11px] font-bold transition-colors duration-150 ${isActivo ? "dark:text-white/30 text-slate-900/35 hover:text-amber-500" : "text-emerald-400 hover:text-emerald-300"}`}
+                  title={isActivo ? "Suspender cuenta" : "Reactivar cuenta"}
+                >
+                  {isActivo ? <Ban size={11} /> : <CheckCircle size={11} />}
+                </button>
               )}
               {onDelete && !isProtected && (
                 <button
@@ -287,31 +310,36 @@ export default function ProfilesPage() {
 
   const navigate = useNavigate();
   const [usuarios,   setUsuarios]   = useState<Usuario[]>([]);
-  const [motos,      setMotos]      = useState<Moto[]>([]);
+  const [carros,      setCarros]      = useState<Carro[]>([]);
   const [roles,      setRoles]      = useState<Rol[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [search,      setSearch]      = useState("");
   const [searchEmail, setSearchEmail] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState<"TODOS" | "ACTIVOS" | "SUSPENDIDOS">("TODOS");
   const [activeTab,  setActiveTab]  = useState("ADMIN");
   const [roleModal,      setRoleModal]      = useState<{ user: Usuario } | null>(null);
   const [selectedRol,    setSelectedRol]    = useState(0);
-  const [selectedModulos, setSelectedModulos] = useState<string[]>(MECANICO_MODULES.map(m => m.key));
+  const [selectedModulos, setSelectedModulos] = useState<string[]>([]);
   const [saving,         setSaving]         = useState(false);
   const [addModal,     setAddModal]     = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Usuario | null>(null);
   const [deleting,     setDeleting]     = useState(false);
   const [viewClient,   setViewClient]   = useState<Usuario | null>(null);
+  const [resetTarget,  setResetTarget]  = useState<Usuario | null>(null);
+  const [resetPwd,     setResetPwd]     = useState("");
+  const [resetTempResult, setResetTempResult] = useState<string | null>(null);
+  const [resetting,    setResetting]    = useState(false);
 
-  /* Motos agrupadas por id de propietario */
-  const motosByUser = useMemo(() => {
-    const map = new Map<number, Moto[]>();
-    motos.forEach(m => {
+  /* Carros agrupadas por id de propietario */
+  const carrosByUser = useMemo(() => {
+    const map = new Map<number, Carro[]>();
+    carros.forEach(m => {
       const arr = map.get(m.id_usuario) ?? [];
       arr.push(m);
       map.set(m.id_usuario, arr);
     });
     return map;
-  }, [motos]);
+  }, [carros]);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(regSchema),
@@ -320,9 +348,9 @@ export default function ProfilesPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [uRes, rRes, mRes] = await Promise.allSettled([usuariosApi.list(), rolesApi.list(), motosApi.list()]);
+      const [uRes, rRes, mRes] = await Promise.allSettled([usuariosApi.list(), rolesApi.list(), carrosApi.list()]);
       if (uRes.status === "fulfilled") setUsuarios(uRes.value.data);
-      if (mRes.status === "fulfilled") setMotos(mRes.value.data as Moto[]);
+      if (mRes.status === "fulfilled") setCarros(mRes.value.data as Carro[]);
       const def = [{ id_rol: 1, nombre: "ADMIN" }, { id_rol: 2, nombre: "MECANICO" }, { id_rol: 3, nombre: "CLIENTE" }];
       if (rRes.status === "fulfilled" && rRes.value.data?.length > 0) setRoles(rRes.value.data);
       else setRoles(def);
@@ -345,9 +373,12 @@ export default function ProfilesPage() {
       const rn = getRolName((u.roles ?? []) as unknown[]);
       const matchTab = activeTab === "SINROL" ? rn === "" : rn === activeTab;
       if (!matchTab) return false;
+      const isActivo = u.activo !== false;
+      if (estadoFiltro === "ACTIVOS" && !isActivo) return false;
+      if (estadoFiltro === "SUSPENDIDOS" && isActivo) return false;
       if (qm && !u.correo?.toLowerCase().includes(qm)) return false;
       if (!q) return true;
-      const placas = (motosByUser.get(u.id_usuario) ?? []).map(m => m.placa.toLowerCase());
+      const placas = (carrosByUser.get(u.id_usuario) ?? []).map(m => m.placa.toLowerCase());
       return (
         u.nombre_completo?.toLowerCase().includes(q) ||
         u.nombre_usuario?.toLowerCase().includes(q) ||
@@ -355,11 +386,11 @@ export default function ProfilesPage() {
         placas.some(p => p.includes(q))
       );
     });
-  }, [usuarios, activeTab, search, searchEmail, motosByUser]);
+  }, [usuarios, activeTab, estadoFiltro, search, searchEmail, carrosByUser]);
 
   const openRoleModal = (u: Usuario) => {
-    const currentPerms = parsePermisos(u.descripcion);
-    setSelectedModulos(currentPerms ?? MECANICO_MODULES.map(m => m.key));
+    const currentPerms = u.permisos ?? [];
+    setSelectedModulos(currentPerms);
     const currentRolNombre = getRolName((u.roles ?? []) as unknown[]);
     const currentRol = roles.find(r => r.nombre?.toUpperCase() === currentRolNombre?.toUpperCase());
     setSelectedRol(currentRol?.id_rol ?? 0);
@@ -384,16 +415,9 @@ export default function ProfilesPage() {
         await rolesApi.assign(roleModal.user.id_usuario, selectedRol);
       }
 
-      /* Siempre guardar permisos en descripcion:
-         - MECANICO → lista de módulos seleccionados
-         - Otro rol  → limpia PERMISOS del campo para no dejar basura */
       const rolNombre = roles.find(r => r.id_rol === selectedRol)?.nombre?.toUpperCase() ?? '';
-      const newDesc = rolNombre === 'MECANICO'
-        ? setPermisos(roleModal.user.descripcion, selectedModulos)
-        : (roleModal.user.descripcion ?? '').replace(/\|?PERMISOS:[^|]*/i, '').trim();
-      await usuariosApi.update(roleModal.user.id_usuario, { descripcion: newDesc });
-
-      toast.success("Rol y permisos guardados · el empleado debe cerrar sesión y volver a entrar");
+      await usuariosApi.guardarPermisos(roleModal.user.id_usuario, rolNombre === 'MECANICO' ? selectedModulos : []);
+      toast.success('Rol y autorizaciones guardados');
       setRoleModal(null);
       fetchData();
     } catch (err) { toast.error(getErrorMsg(err)); }
@@ -412,10 +436,40 @@ export default function ProfilesPage() {
     finally { setDeleting(false); }
   };
 
+  const handleToggleActivo = async (u: Usuario) => {
+    const siguiente = u.activo === false;
+    try {
+      await usuariosApi.cambiarEstado(u.id_usuario, siguiente);
+      toast.success(siguiente ? `Cuenta de ${u.nombre_completo} reactivada` : `Cuenta de ${u.nombre_completo} suspendida`);
+      fetchData();
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTarget || resetting) return;
+    if (resetPwd.trim() && resetPwd.trim().length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    setResetting(true);
+    try {
+      const { data } = await usuariosApi.restablecerClave(resetTarget.id_usuario, resetPwd.trim() || undefined);
+      setResetTempResult(data.contrasenaTemporal);
+      toast.success("Contraseña restablecida e historial de sesiones cerrado");
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const onAddUser = async (data: Record<string, string>) => {
     setSaving(true);
     try {
-      const correo = data.correo?.trim() || `${data.nombre_usuario}@gmotors.com`;
+      const correo = data.correo?.trim() || `${data.nombre_usuario}@openmotors.com`;
 
       const { data: { usuario: newUser } } = await usuariosApi.createClient({
         nombre_completo: data.nombre_completo,
@@ -568,6 +622,16 @@ export default function ProfilesPage() {
             type="email"
           />
         </div>
+        <select
+          aria-label="Filtrar por estado"
+          className="gm-select-d"
+          value={estadoFiltro}
+          onChange={e => setEstadoFiltro(e.target.value as "TODOS" | "ACTIVOS" | "SUSPENDIDOS")}
+        >
+          <option value="TODOS">Todos los estados</option>
+          <option value="ACTIVOS">Solo activos</option>
+          <option value="SUSPENDIDOS">Solo suspendidos</option>
+        </select>
         <AnimatePresence>
           {(search || searchEmail) && (
             <motion.button
@@ -623,8 +687,10 @@ export default function ProfilesPage() {
                 key={u.id_usuario}
                 u={u}
                 roleName={getRolName((u.roles ?? []) as unknown[])}
-                motosCount={(motosByUser.get(u.id_usuario) ?? []).length}
+                carrosCount={(carrosByUser.get(u.id_usuario) ?? []).length}
                 onAssign={(uu: Usuario) => openRoleModal(uu)}
+                onToggleActivo={isAdmin && me?.id_usuario !== u.id_usuario ? handleToggleActivo : undefined}
+                onResetPwd={isAdmin ? (uu: Usuario) => { setResetTarget(uu); setResetPwd(""); setResetTempResult(null); } : undefined}
                 onView={(uu: Usuario) => setViewClient(uu)}
                 onDelete={isAdmin ? (uu: Usuario) => setDeleteTarget(uu) : undefined}
               />
@@ -694,17 +760,17 @@ export default function ProfilesPage() {
               </div>
             </div>
 
-            {/* Módulos accesibles */}
+            {/* Autorizaciones adicionales */}
             <div>
               <p className="text-[10px] tracking-[0.25em] uppercase font-black dark:text-white/25 text-slate-900/25 mb-3">
-                Módulos accesibles
+                Autorizaciones adicionales
               </p>
               {(() => {
                 const rolNombre = roles.find(r => r.id_rol === selectedRol)?.nombre?.toUpperCase() ?? "";
                 if (rolNombre === "MECANICO") {
                   return (
                     <div className="space-y-1 p-3 rounded-xl" style={{ background: isDark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.04)", border: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid #E4E7EC" }}>
-                      <p className="text-[10px] mb-2" style={{ color: isDark ? "rgba(96,165,250,0.7)" : "#2563EB" }}>Elige qué puede ver este mecánico:</p>
+                      <p className="text-[10px] mb-2" style={{ color: isDark ? "rgba(96,165,250,0.7)" : "#2563EB" }}>El mecánico ya puede atender sus órdenes asignadas. Autoriza tareas adicionales:</p>
                       {MECANICO_MODULES.map(m => {
                         const checked = selectedModulos.includes(m.key);
                         return (
@@ -839,7 +905,51 @@ export default function ProfilesPage() {
         </div>
       </Modal>
 
-      {/* ══ MODAL: Detalle de usuario + sus motos ══ */}
+      {/* ══ MODAL: Restablecer contraseña (Admin) ══ */}
+      <Modal
+        open={!!resetTarget}
+        onClose={() => { setResetTarget(null); setResetPwd(""); setResetTempResult(null); }}
+        title="Restablecer contraseña"
+        size="sm"
+      >
+        {resetTempResult ? (
+          <div className="space-y-4">
+            <p className="text-sm dark:text-white/80 text-slate-800">
+              Nueva contraseña asignada para <strong>{resetTarget?.nombre_completo}</strong>:
+            </p>
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 font-mono text-sm font-bold text-emerald-400 select-all">
+              {resetTempResult}
+            </div>
+            <p className="text-xs opacity-60">
+              Las sesiones anteriores de esta cuenta fueron cerradas automáticamente. Entrega esta clave al usuario.
+            </p>
+            <div className="flex justify-end">
+              <Button onClick={() => { setResetTarget(null); setResetTempResult(null); }}>Listo</Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <p className="text-xs dark:text-white/60 text-slate-600">
+              Cuenta: <strong>{resetTarget?.nombre_completo}</strong> (@{resetTarget?.nombre_usuario})
+            </p>
+            <Input
+              label="Nueva contraseña (opcional)"
+              type="text"
+              placeholder="Déjalo vacío para generar una aleatoria segura"
+              value={resetPwd}
+              onChange={e => setResetPwd(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setResetTarget(null)}>Cancelar</Button>
+              <Button type="submit" loading={resetting}>
+                <KeyRound size={14} /> Restablecer
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ══ MODAL: Detalle de usuario + sus carros ══ */}
       <Modal
         open={!!viewClient}
         onClose={() => setViewClient(null)}
@@ -849,7 +959,7 @@ export default function ProfilesPage() {
         {viewClient && (() => {
           const ced   = extractCedula(viewClient.descripcion);
           const tel   = viewClient.descripcion?.match(/TELEFONO:\s*([^\s|]+)/)?.[1];
-          const sus   = motosByUser.get(viewClient.id_usuario) ?? [];
+          const sus   = carrosByUser.get(viewClient.id_usuario) ?? [];
           const rn    = getRolName((viewClient.roles ?? []) as unknown[]);
           const tab   = TABS.find(t => t.key === rn);
           const color = tab?.color ?? "#8B8FA8";
@@ -888,7 +998,7 @@ export default function ProfilesPage() {
                 ))}
               </div>
 
-              {/* Motos del usuario */}
+              {/* Carros del usuario */}
               <div>
                 <p className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase font-black dark:text-white/25 text-slate-900/25 mb-3">
                   <Car size={11} /> Vehículos registrados ({sus.length})
@@ -902,7 +1012,7 @@ export default function ProfilesPage() {
                     {sus.map(m => (
                       <button
                         key={m.id_vehiculo}
-                        onClick={() => { setViewClient(null); navigate(`/motos/${m.id_vehiculo}`); }}
+                        onClick={() => { setViewClient(null); navigate(`/carros/${m.id_vehiculo}`); }}
                         className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-150"
                         style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(59,130,246,0.4)"; (e.currentTarget as HTMLElement).style.background = "rgba(59,130,246,0.06)"; }}

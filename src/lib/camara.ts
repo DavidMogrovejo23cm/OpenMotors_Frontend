@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Captura de fotos
+   OpenMotors — Captura de fotos
    - En el APK (Capacitor) usa la cámara/galería nativa con permisos.
    - En la web usa el <input type=file> normal (fallback).
    Devuelve siempre un dataURL JPEG comprimido listo para guardar en la BD.
@@ -26,7 +26,7 @@ export async function tomarFotoNativa(origen: 'camara' | 'galeria' | 'preguntar'
   if (perm.camera !== 'granted') {
     const result = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
     if (result.camera !== 'granted') {
-      throw new Error('Permiso de cámara denegado. Ve a Configuración > Open Motors > Permisos para activarla.');
+      throw new Error('Permiso de cámara denegado. Ve a Configuración > OpenMotors > Permisos para activarla.');
     }
   }
 
@@ -41,7 +41,7 @@ export async function tomarFotoNativa(origen: 'camara' | 'galeria' | 'preguntar'
     allowEditing: false,
     resultType:   CameraResultType.DataUrl,   // devuelve "data:image/jpeg;base64,..."
     source,
-    promptLabelHeader:  'Foto de tu moto',
+    promptLabelHeader:  'Foto de tu carro',
     promptLabelPhoto:   'Elegir de la galería',
     promptLabelPicture: 'Tomar foto',
     promptLabelCancel:  'Cancelar',

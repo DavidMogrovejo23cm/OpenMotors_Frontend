@@ -1,27 +1,29 @@
 /* ─────────────────────────────────────────────
-   GMotors — Rastreador de Combustible (galones)
+   OpenMotors — Rastreador de Combustible (galones)
    Tipos: Extra / Super / Eco / Diésel (Ecuador)
-   km_anterior se auto-llena del km del moto
-   km_actual es opcional; si se da, actualiza el km de la moto
+   km_anterior se auto-llena del km del carro
+   km_actual es opcional; si se da, actualiza el km del carro
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Fuel, Plus, Trash2, TrendingDown, DollarSign, Gauge, X,
+  Fuel, Plus, Trash2, TrendingDown, DollarSign, Gauge,
   AlertTriangle, TrendingUp, Activity, Wrench, Search, Users, Mail, Star,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
-import { motosApi, combustibleApi, usuariosApi } from '../../lib/api';
+import { carrosApi, combustibleApi, usuariosApi } from '../../lib/api';
 import { usePolling } from '../../hooks/usePolling';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../components/ui/Toast';
+import Modal from '../../components/ui/Modal';
+import Button from '../../components/ui/Button';
 import { getErrorMsg, fmtDate, fmtMoney } from '../../lib/utils';
-import type { Moto, CargaCombustible, Usuario } from '../../types';
+import type { Carro, CargaCombustible, Usuario } from '../../types';
 
 /* ── Tipos de combustible Ecuador (precios controlados 2026) ── */
 const COMBUSTIBLES = [
@@ -63,13 +65,13 @@ export default function CombustiblePage() {
   const toast = useToast();
   const [theme] = useTheme();
   const isDark = theme === 'dark';
-  const [motos,    setMotos]    = useState<Moto[]>([]);
+  const [carros,    setCarros]    = useState<Carro[]>([]);
   const [logs,     setLogs]     = useState<CargaCombustible[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [open,    setOpen]    = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [form,    setForm]    = useState<FormState>(emptyForm());
-  const [selMoto, setSelMoto] = useState<number | null>(null);
+  const [selCarro, setSelCarro] = useState<number | null>(null);
   const [month,   setMonth]   = useState(() => new Date().toISOString().slice(0, 7));
   const [precios, setPrecios] = useState<Record<string, number>>(() => Object.fromEntries(COMBUSTIBLES.map(c => [c.tipo, c.precio])));
   const [editPrecios, setEditPrecios] = useState(false);
@@ -77,11 +79,11 @@ export default function CombustiblePage() {
   /* Admin: buscador global (usuario, correo, placa) y vista de todos los registros */
   const [adminSearch, setAdminSearch] = useState('');
 
-  const cargarLogs = useCallback((misMotos: Moto[]) => {
+  const cargarLogs = useCallback((misCarros: Carro[]) => {
     if (isAdmin || isMecanico) {
       combustibleApi.list().then(r => setLogs(r.data as CargaCombustible[])).catch(() => {});
     } else {
-      Promise.allSettled(misMotos.map(m => combustibleApi.byMoto(m.id_vehiculo)))
+      Promise.allSettled(misCarros.map(m => combustibleApi.byCarro(m.id_vehiculo)))
         .then(res => {
           const all: CargaCombustible[] = [];
           res.forEach(r => { if (r.status === 'fulfilled') all.push(...(r.value.data as CargaCombustible[])); });
@@ -92,12 +94,12 @@ export default function CombustiblePage() {
 
   const recargar = useCallback(async () => {
     try {
-      const r = await motosApi.list();
-      const all: Moto[] = r.data;
+      const r = await carrosApi.list();
+      const all: Carro[] = r.data;
       const mine = (isAdmin || isMecanico) ? all : all.filter(m => m.id_usuario === user?.id_usuario);
-      setMotos(mine);
-      // Preserva la moto ya seleccionada (no pisa la elección del usuario en cada poll)
-      setSelMoto(prev => prev ?? (mine.length > 0 ? mine[0].id_vehiculo : null));
+      setCarros(mine);
+      // Preserval carro ya seleccionado (no pisa la elección del usuario en cada poll)
+      setSelCarro(prev => prev ?? (mine.length > 0 ? mine[0].id_vehiculo : null));
       cargarLogs(mine);
     } catch { /* silencioso */ }
     if (isAdmin || isMecanico) {
@@ -117,21 +119,21 @@ export default function CombustiblePage() {
   usePolling(recargar, { intervalMs: 30_000 });
 
   /* Dueño (nombre + correo) por id_vehiculo — para la vista de admin */
-  const ownerByMoto = useMemo(() => {
+  const ownerByCarro = useMemo(() => {
     const uById = new Map(usuarios.map(u => [u.id_usuario, u]));
     const map = new Map<number, { nombre: string; correo: string }>();
-    motos.forEach(m => {
+    carros.forEach(m => {
       const u = uById.get(m.id_usuario);
       map.set(m.id_vehiculo, { nombre: u?.nombre_completo ?? '—', correo: u?.correo ?? '—' });
     });
     return map;
-  }, [motos, usuarios]);
+  }, [carros, usuarios]);
 
   /* Todos los registros enriquecidos con dueño (admin) — con buscador */
   const adminRows = useMemo(() => {
     const q = adminSearch.toLowerCase().trim();
     return logs
-      .map(l => ({ ...l, owner: ownerByMoto.get(l.id_vehiculo) ?? { nombre: '—', correo: '—' } }))
+      .map(l => ({ ...l, owner: ownerByCarro.get(l.id_vehiculo) ?? { nombre: '—', correo: '—' } }))
       .filter(r => {
         if (!q) return true;
         return (
@@ -141,7 +143,7 @@ export default function CombustiblePage() {
         );
       })
       .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
-  }, [logs, ownerByMoto, adminSearch]);
+  }, [logs, ownerByCarro, adminSearch]);
 
   /* ── Manejadores del formulario ── */
   const f = (k: keyof FormState) =>
@@ -158,23 +160,23 @@ export default function CombustiblePage() {
       });
     };
 
-  /* Al cambiar moto en el form: pre-llenar km_anterior con el km actual de esa moto */
-  const onMotoChange = (motoId: string) => {
-    const moto = motos.find(m => m.id_vehiculo === Number(motoId));
+  /* Al cambiar carro en el form: pre-llenar km_anterior con el km actual de esa carro */
+  const onCarroChange = (carroId: string) => {
+    const carro = carros.find(m => m.id_vehiculo === Number(carroId));
     setForm(prev => ({
       ...prev,
-      id_vehiculo: motoId,
-      km_anterior: moto && moto.kilometraje > 0 ? String(moto.kilometraje) : prev.km_anterior,
+      id_vehiculo: carroId,
+      km_anterior: carro && carro.kilometraje > 0 ? String(carro.kilometraje) : prev.km_anterior,
     }));
   };
 
   const abrirModal = () => {
     const nuevoForm = emptyForm();
-    /* Pre-seleccionar la moto del filtro activo */
-    if (selMoto) {
-      const moto = motos.find(m => m.id_vehiculo === selMoto);
-      nuevoForm.id_vehiculo = String(selMoto);
-      if (moto && moto.kilometraje > 0) nuevoForm.km_anterior = String(moto.kilometraje);
+    /* Pre-seleccionar el carro del filtro activo */
+    if (selCarro) {
+      const carro = carros.find(m => m.id_vehiculo === selCarro);
+      nuevoForm.id_vehiculo = String(selCarro);
+      if (carro && carro.kilometraje > 0) nuevoForm.km_anterior = String(carro.kilometraje);
     }
     setForm(nuevoForm);
     setOpen(true);
@@ -182,10 +184,10 @@ export default function CombustiblePage() {
 
   const addLog = async () => {
     if (!form.id_vehiculo || !form.fecha || !form.litros) {
-      toast.error('Completa: moto, fecha y galones cargados');
+      toast.error('Completa: carro, fecha y galones cargados');
       return;
     }
-    const moto = motos.find(m => m.id_vehiculo === Number(form.id_vehiculo));
+    const carro = carros.find(m => m.id_vehiculo === Number(form.id_vehiculo));
     const galones   = Number(form.litros);
     const costoFinal = form.costo_total
       ? Number(form.costo_total)
@@ -197,7 +199,7 @@ export default function CombustiblePage() {
     try {
       await combustibleApi.create({
         id_vehiculo:          Number(form.id_vehiculo),
-        placa:            moto?.placa ?? '—',
+        placa:            carro?.placa ?? '—',
         fecha:            form.fecha,
         litros:           galones,
         costo_total:      costoFinal,
@@ -206,13 +208,13 @@ export default function CombustiblePage() {
         notas:            `[${form.tipo_combustible.toUpperCase()}] ${form.notas || ''}`.trim(),
       });
 
-      /* Actualizar km de la moto si se ingresó km_actual.
+      /* Actualizar km del carro si se ingresó km_actual.
          Enviamos SOLO el kilometraje (update parcial en el backend) para nunca
          arrastrar datos viejos ni la foto — el backend conserva el resto. */
-      if (moto && kmActual && kmActual > 0) {
-        await motosApi.update(moto.id_vehiculo, { kilometraje: kmActual }).catch(() => {});
-        /* Actualizar lista local de motos con el nuevo km */
-        setMotos(prev => prev.map(m => m.id_vehiculo === moto.id_vehiculo ? { ...m, kilometraje: kmActual } : m));
+      if (carro && kmActual && kmActual > 0) {
+        await carrosApi.update(carro.id_vehiculo, { kilometraje: kmActual }).catch(() => {});
+        /* Actualizar lista local de carros con el nuevo km */
+        setCarros(prev => prev.map(m => m.id_vehiculo === carro.id_vehiculo ? { ...m, kilometraje: kmActual } : m));
       }
 
       const kmRec = kmActual && kmAnterior ? kmActual - kmAnterior : null;
@@ -231,17 +233,17 @@ export default function CombustiblePage() {
       }
       setOpen(false);
       setForm(emptyForm());
-      cargarLogs(motos);
+      cargarLogs(carros);
     } catch (err) { toast.error(getErrorMsg(err)); }
     finally { setSaving(false); }
   };
 
   /* ── Datos filtrados ── */
   const filtered = useMemo(() => logs.filter(l => {
-    const motoOk  = selMoto == null || l.id_vehiculo === selMoto;
+    const carroOk  = selCarro == null || l.id_vehiculo === selCarro;
     const monthOk = !month || (typeof l.fecha === 'string' && l.fecha.startsWith(month));
-    return motoOk && monthOk;
-  }).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))), [logs, selMoto, month]);
+    return carroOk && monthOk;
+  }).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))), [logs, selCarro, month]);
 
   /* ── Métricas ── */
   const metrics = useMemo(() => {
@@ -302,7 +304,7 @@ export default function CombustiblePage() {
   }, [logs, canManage]);
 
   const removeLog = async (id: number) => {
-    try { await combustibleApi.remove(id); cargarLogs(motos); }
+    try { await combustibleApi.remove(id); cargarLogs(carros); }
     catch (err) { toast.error(getErrorMsg(err)); }
   };
 
@@ -327,7 +329,7 @@ export default function CombustiblePage() {
     }
   };
 
-  const selectedMoto = motos.find(m => m.id_vehiculo === selMoto);
+  const selectedCarro = carros.find(m => m.id_vehiculo === selCarro);
   const costoEst = form.litros
     ? (Number(form.litros) * (precios[form.tipo_combustible] ?? precioXTipo(form.tipo_combustible))).toFixed(2)
     : '0.00';
@@ -341,7 +343,7 @@ export default function CombustiblePage() {
           <div className="flex items-center gap-2 mb-1">
             <Fuel size={13} className="text-gm-red/60" />
             <span className="text-[10px] tracking-[0.3em] uppercase dark:text-white/28 text-slate-900/28 font-bold">
-              Open Motors · Combustible
+              OpenMotors · Combustible
             </span>
           </div>
           <h1 className="text-[2rem] font-black dark:text-white text-slate-900 leading-tight tracking-tight">
@@ -421,11 +423,11 @@ export default function CombustiblePage() {
       <div className="flex items-center gap-3 flex-wrap">
         <select
           className="gm-select-d"
-          value={selMoto ?? ''}
-          onChange={e => setSelMoto(e.target.value ? Number(e.target.value) : null)}
+          value={selCarro ?? ''}
+          onChange={e => setSelCarro(e.target.value ? Number(e.target.value) : null)}
         >
-          <option value="">Todas las motos</option>
-          {motos.map(m => (
+          <option value="">Todas los carros</option>
+          {carros.map(m => (
             <option key={m.id_vehiculo} value={m.id_vehiculo}>
               {m.placa} — {m.marca} {m.modelo}
             </option>
@@ -584,11 +586,11 @@ export default function CombustiblePage() {
               Última carga: <b style={{ color: '#F59E0B' }}>{anomaly.last} km/gal</b> vs. promedio de{' '}
               <b className="dark:text-white/70 text-slate-900/70">{anomaly.avg} km/gal</b>. Revisar llantas, filtro de aire, bujía.
             </p>
-            {selMoto && (
-              <Link to={`/motos/${selMoto}`}
+            {selCarro && (
+              <Link to={`/carros/${selCarro}`}
                 className="inline-flex items-center gap-1.5 mt-2 text-[12px] font-bold"
                 style={{ color: '#F59E0B' }}>
-                <Wrench size={12} /> Ver salud de esta moto →
+                <Wrench size={12} /> Ver salud de este carro →
               </Link>
             )}
           </div>
@@ -702,7 +704,7 @@ export default function CombustiblePage() {
           <p className="text-[11px] tracking-[0.28em] uppercase dark:text-white/28 text-slate-900/28 font-bold">
             Registros ({filtered.length})
           </p>
-          {selectedMoto && <span className="plate-tag">{selectedMoto.placa}</span>}
+          {selectedCarro && <span className="plate-tag">{selectedCarro.placa}</span>}
         </div>
 
         {filtered.length === 0 ? (
@@ -768,147 +770,180 @@ export default function CombustiblePage() {
       </div>
 
       {/* ── Modal Registrar carga ── */}
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
-        >
-          <div className="w-full max-w-lg rounded-3xl p-6"
-               style={{
-                 background: isDark ? 'linear-gradient(150deg, #1E1E28 0%, #161620 100%)' : '#FFFFFF',
-                 border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E4E7EC',
-                 boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.6)' : '0 24px 60px rgba(0,0,0,0.12)',
-               }}>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-lg font-black dark:text-white text-slate-900">Registrar carga</h2>
-                <p className="text-[12px] dark:text-white/35 text-slate-900/35">Nuevo registro de combustible</p>
-              </div>
-              <button onClick={() => setOpen(false)} className="icon-btn"><X size={16} /></button>
-            </div>
-
-            <div className="space-y-3">
-
-              {/* Fila 1: Moto + Fecha */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">Moto *</label>
-                  <select className="gm-select-d w-full" value={form.id_vehiculo}
-                    onChange={e => onMotoChange(e.target.value)}>
-                    <option value="">Seleccionar</option>
-                    {motos.map(m => <option key={m.id_vehiculo} value={m.id_vehiculo}>{m.placa} — {m.marca}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">Fecha *</label>
-                  <input type="date" className="gm-input-d w-full" value={form.fecha} onChange={f('fecha')} />
-                </div>
-              </div>
-
-              {/* Fila 2: Tipo combustible */}
-              <div>
-                <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">
-                  Tipo de combustible *
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {COMBUSTIBLES.map(c => (
-                    <button
-                      key={c.tipo}
-                      type="button"
-                      onClick={() => f('tipo_combustible')({ target: { value: c.tipo } } as React.ChangeEvent<HTMLSelectElement>)}
-                      className="py-2 px-1 rounded-xl text-[11px] font-bold transition-all text-center leading-tight"
-                      style={form.tipo_combustible === c.tipo
-                        ? { background: `${c.color}25`, color: c.color, border: `1px solid ${c.color}60` }
-                        : isDark
-                          ? { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.07)' }
-                          : { background: 'rgba(0,0,0,0.03)', color: 'rgba(21,21,27,0.6)', border: '1px solid #E4E7EC' }
-                      }
-                    >
-                      {c.label.split(' ')[0]}<br/>
-                      <span className="text-[10px] opacity-75">${Number(precios[c.tipo] ?? c.precio).toFixed(2)}/gal</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Fila 3: Galones + Costo */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">Galones *</label>
-                  <input type="number" step="0.1" min="0" placeholder="Ej. 2.5"
-                    className="gm-input-d w-full" value={form.litros} onChange={f('litros')} />
-                </div>
-                <div>
-                  <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">
-                    Costo total USD
-                    {form.litros && (
-                      <span className="dark:text-white/25 text-slate-900/25 normal-case font-normal ml-1">
-                        (est. ${costoEst})
-                      </span>
-                    )}
-                  </label>
-                  <input type="number" step="0.01" min="0" placeholder={costoEst}
-                    className="gm-input-d w-full" value={form.costo_total} onChange={f('costo_total')} />
-                </div>
-              </div>
-
-              {/* Fila 4: Km anterior + Km actual */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">
-                    Km anterior
-                    <span className="text-[10px] text-emerald-400/70 font-normal normal-case ml-1">(auto)</span>
-                  </label>
-                  <input type="number" min="0" placeholder="0"
-                    className="gm-input-d w-full"
-                    value={form.km_anterior} onChange={f('km_anterior')} />
-                </div>
-                <div>
-                  <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">
-                    Km actual
-                    <span className="text-[10px] dark:text-white/25 text-slate-900/25 font-normal normal-case ml-1">(odómetro)</span>
-                  </label>
-                  <input type="number" min="0" placeholder="Leer del odómetro"
-                    className="gm-input-d w-full" value={form.km_actual} onChange={f('km_actual')} />
-                </div>
-              </div>
-              {form.km_anterior && form.km_actual && Number(form.km_actual) > Number(form.km_anterior) && (
-                <p className="text-[11px] text-emerald-400/70 -mt-1">
-                  Recorridos: <b>{(Number(form.km_actual) - Number(form.km_anterior)).toLocaleString()} km</b>
-                  {form.litros && Number(form.litros) > 0 && (
-                    <span className="dark:text-white/40 text-slate-900/40 ml-2">
-                      → <b className="text-yellow-400">{((Number(form.km_actual) - Number(form.km_anterior)) / Number(form.litros)).toFixed(1)} km/gal</b>
-                    </span>
-                  )}
-                </p>
-              )}
-
-              {/* Notas */}
-              <div>
-                <label className="block text-[11px] dark:text-white/40 text-slate-900/40 font-bold uppercase tracking-wider mb-1.5">Notas</label>
-                <input type="text" placeholder="Gasolinera, observaciones…"
-                  className="gm-input-d w-full" value={form.notas} onChange={f('notas')} />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setOpen(false)}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm dark:text-white/40 text-slate-900/40 border border-white/[0.08] hover:border-white/15 transition-all">
-                Cancelar
-              </button>
-              <button
-                onClick={addLog}
-                disabled={saving || !form.id_vehiculo || !form.fecha || !form.litros}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm dark:text-white text-slate-900 transition-all disabled:opacity-40"
-                style={{ background: '#E11428' }}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Registrar carga"
+        description="Nuevo registro de combustible"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={addLog}
+              loading={saving}
+              disabled={!form.id_vehiculo || !form.fecha || !form.litros}
+            >
+              Guardar registro
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          {/* Fila 1: Carro + Fecha */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Vehículo *
+              </label>
+              <select
+                className="gm-select-d w-full"
+                value={form.id_vehiculo}
+                onChange={e => onCarroChange(e.target.value)}
               >
-                {saving ? 'Guardando…' : 'Guardar registro'}
-              </button>
+                <option value="">Seleccionar vehículo</option>
+                {carros.map(m => (
+                  <option key={m.id_vehiculo} value={m.id_vehiculo}>
+                    {m.placa} — {m.marca} {m.modelo}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Fecha *
+              </label>
+              <input
+                type="date"
+                className="gm-input-d w-full"
+                value={form.fecha}
+                onChange={f('fecha')}
+              />
             </div>
           </div>
+
+          {/* Fila 2: Tipo combustible */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              Tipo de combustible *
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {COMBUSTIBLES.map(c => (
+                <button
+                  key={c.tipo}
+                  type="button"
+                  onClick={() => f('tipo_combustible')({ target: { value: c.tipo } } as React.ChangeEvent<HTMLSelectElement>)}
+                  className="py-2.5 px-1.5 rounded-xl text-xs font-bold transition-all text-center leading-tight cursor-pointer"
+                  style={form.tipo_combustible === c.tipo
+                    ? { background: `${c.color}20`, color: c.color, border: `1px solid ${c.color}60` }
+                    : isDark
+                      ? { background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.08)' }
+                      : { background: 'rgba(0,0,0,0.02)', color: 'rgba(21,21,27,0.65)', border: '1px solid #E5E7EB' }
+                  }
+                >
+                  {c.label.split(' ')[0]}<br/>
+                  <span className="text-[10.5px] opacity-75 font-normal">${Number(precios[c.tipo] ?? c.precio).toFixed(2)}/gal</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fila 3: Galones + Costo */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Galones *
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                placeholder="Ej. 2.5"
+                className="gm-input-d w-full"
+                value={form.litros}
+                onChange={f('litros')}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Costo total USD
+                {form.litros && (
+                  <span className="text-slate-400 font-normal ml-1">
+                    (est. ${costoEst})
+                  </span>
+                )}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={costoEst}
+                className="gm-input-d w-full"
+                value={form.costo_total}
+                onChange={f('costo_total')}
+              />
+            </div>
+          </div>
+
+          {/* Fila 4: Km anterior + Km actual */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Km anterior
+                <span className="text-[10px] text-emerald-500 font-normal ml-1">(auto)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                className="gm-input-d w-full"
+                value={form.km_anterior}
+                onChange={f('km_anterior')}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Km actual
+                <span className="text-[10px] text-slate-400 font-normal ml-1">(odómetro)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="Leer del odómetro"
+                className="gm-input-d w-full"
+                value={form.km_actual}
+                onChange={f('km_actual')}
+              />
+            </div>
+          </div>
+          {form.km_anterior && form.km_actual && Number(form.km_actual) > Number(form.km_anterior) && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 -mt-1 font-medium">
+              Recorridos: <b>{(Number(form.km_actual) - Number(form.km_anterior)).toLocaleString()} km</b>
+              {form.litros && Number(form.litros) > 0 && (
+                <span className="text-slate-500 dark:text-slate-400 ml-2">
+                  → <b className="text-amber-500">{((Number(form.km_actual) - Number(form.km_anterior)) / Number(form.litros)).toFixed(1)} km/gal</b>
+                </span>
+              )}
+            </p>
+          )}
+
+          {/* Notas */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              Notas
+            </label>
+            <input
+              type="text"
+              placeholder="Gasolinera, observaciones…"
+              className="gm-input-d w-full"
+              value={form.notas}
+              onChange={f('notas')}
+            />
+          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

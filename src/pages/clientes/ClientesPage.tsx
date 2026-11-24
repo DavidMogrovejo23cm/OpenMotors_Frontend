@@ -2,24 +2,24 @@ import { isAxiosError } from 'axios';
 import type { LucideIcon } from 'lucide-react';
 import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
-   Open Motors — Gestión de Clientes
+   OpenMotors — Gestión de Clientes
    Historial de servicios, vehículos y compras
    ───────────────────────────────────────────── */
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Search, Users, Phone, MapPin, Mail, Lock, Unlock, ChevronRight, Wrench, Shield, ArrowLeft, CreditCard, TrendingUp, Calendar, Car, Activity, CheckCircle, Clock, Package, ChevronDown, ChevronUp, Gauge, Send, CircleAlert } from 'lucide-react';
+import { Search, Users, Phone, MapPin, Mail, Lock, Unlock, ChevronRight, Wrench, Shield, ArrowLeft, CreditCard, TrendingUp, Calendar, Car, Activity, CheckCircle, Clock, Package, ChevronDown, ChevronUp, Gauge, Send, CircleAlert, Edit3, UserPlus } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { safeFromTo } from '../../hooks/useGsap';
 import {
-  usuariosApi, registrosApi, motosApi,
+  usuariosApi, registrosApi, carrosApi,
   facturasApi, detallesFacturaApi, authApi, ofertaApi,
 } from '../../lib/api';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
-import { fmtDate, fmtMoney, ESTADO_REGISTRO, extractPhone, extractCedula, initials, toIsoStr } from '../../lib/utils';
-import { imagenMoto } from '../../lib/fotos';
+import { fmtDate, fmtMoney, ESTADO_REGISTRO, extractPhone, extractCedula, initials, toIsoStr, getErrorMsg } from '../../lib/utils';
+import { imagenCarro } from '../../lib/fotos';
 import { cleanDescripcion, detalleKind } from '../../lib/detalles';
-import type { Usuario, Moto, Factura, DetalleFactura } from '../../types';
+import type { Usuario, Carro, Factura, DetalleFactura } from '../../types';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -40,23 +40,23 @@ interface Reg {
   detalles?: DetalleFactura[];
 }
 
-type BV = 'warning'|'info'|'success'|'purple'|'teal'|'default';
-const VARIANT_MAP: Record<number, BV> = { 0:'warning', 1:'info', 2:'success', 3:'purple', 4:'teal' };
-type DetailTab = 'servicios' | 'motos' | 'compras';
+type BV = 'warning' | 'info' | 'success' | 'purple' | 'teal' | 'default';
+const VARIANT_MAP: Record<number, BV> = { 0: 'warning', 1: 'info', 2: 'success', 3: 'purple', 4: 'teal' };
+type DetailTab = 'servicios' | 'carros' | 'compras';
 
 /* ═══ HELPERS ═════════════════════════════════ */
-function normalizeReg(r: Record<string,unknown>): Reg {
+function normalizeReg(r: Record<string, unknown>): Reg {
   return {
-    id:             Number(r.id_registro  ?? r.idRegistro  ?? 0),
+    id: Number(r.id_registro ?? r.idRegistro ?? 0),
     nombre_cliente: String(r.nombre_cliente ?? r.nombreCliente ?? ''),
-    placa:          String(r.placa ?? r.placaMoto ?? ''),
-    tipo_servicio:  String(r.tipo_servicio ?? r.tipoMantenimiento ?? ''),
-    costo_total:    Number(r.costo_total ?? r.costoTotal ?? 0),
-    estado:         Number(r.estado ?? 0),
-    fecha:          String(r.fecha ?? ''),
-    descripcion:    String(r.descripcion ?? ''),
-    kilometraje:    r.kilometraje != null ? Number(r.kilometraje) : null,
-    detalles:       Array.isArray(r.detalles) ? r.detalles as DetalleFactura[] : [],
+    placa: String(r.placa ?? r.placaCarro ?? ''),
+    tipo_servicio: String(r.tipo_servicio ?? r.tipoMantenimiento ?? ''),
+    costo_total: Number(r.costo_total ?? r.costoTotal ?? 0),
+    estado: Number(r.estado ?? 0),
+    fecha: String(r.fecha ?? ''),
+    descripcion: String(r.descripcion ?? ''),
+    kilometraje: r.kilometraje != null ? Number(r.kilometraje) : null,
+    detalles: Array.isArray(r.detalles) ? r.detalles as DetalleFactura[] : [],
   };
 }
 
@@ -65,34 +65,34 @@ function getRolName(roles: unknown[] | null | undefined): string {
   const r = roles[0];
   const raw = typeof r === 'string'
     ? r
-    : ((r as {nombre?:string;rol?:{nombre?:string}}).rol?.nombre
-        ?? (r as {nombre?:string}).nombre ?? '');
+    : ((r as { nombre?: string; rol?: { nombre?: string } }).rol?.nombre
+      ?? (r as { nombre?: string }).nombre ?? '');
   return raw.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 /* ═══ COMPONENTES PEQUEÑOS ════════════════════ */
-function Avatar({ name, size='md' }: { name:string; size?:'sm'|'md'|'lg'|'xl' }) {
-  const palette:[string,string][] = [
-    ['#3B82F6','#1D4ED8'],['#8B5CF6','#6D28D9'],['#10B981','#047857'],
-    ['#F59E0B','#B45309'],['#E11428','#9E0E1B'],['#06B6D4','#0E7490'],
+function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
+  const palette: [string, string][] = [
+    ['#3B82F6', '#1D4ED8'], ['#8B5CF6', '#6D28D9'], ['#10B981', '#047857'],
+    ['#F59E0B', '#B45309'], ['#E11428', '#9E0E1B'], ['#06B6D4', '#0E7490'],
   ];
   const [bg, bd] = palette[name.charCodeAt(0) % palette.length];
-  const sz = { sm:'w-9 h-9 text-xs', md:'w-11 h-11 text-sm', lg:'w-14 h-14 text-base', xl:'w-16 h-16 text-lg' }[size];
+  const sz = { sm: 'w-9 h-9 text-xs', md: 'w-11 h-11 text-sm', lg: 'w-14 h-14 text-base', xl: 'w-16 h-16 text-lg' }[size];
   return (
     <div className={`${sz} rounded-2xl flex items-center justify-center font-black shrink-0 select-none`}
-         style={{ background:`${bg}30`, border:`2px solid ${bd}60`, color:bg }}>
+      style={{ background: `${bg}30`, border: `2px solid ${bd}60`, color: bg }}>
       {initials(name)}
     </div>
   );
 }
 
-function StatChip({ icon:Icon, label, value, color='#3B82F6' }:{
-  icon:LucideIcon; label:string; value:string|number; color?:string;
+function StatChip({ icon: Icon, label, value, color = '#3B82F6' }: {
+  icon: LucideIcon; label: string; value: string | number; color?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background:`${color}12`, border:`1px solid ${color}28` }}>
+    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: `${color}12`, border: `1px solid ${color}28` }}>
       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-           style={{ background:`${color}20` }}>
+        style={{ background: `${color}20` }}>
         <Icon size={15} style={{ color }} />
       </div>
       <div>
@@ -104,25 +104,27 @@ function StatChip({ icon:Icon, label, value, color='#3B82F6' }:{
 }
 
 /* ═══ HISTORIAL PANEL — 360° ══════════════════ */
-function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnlock }: {
+function HistoryPanel({ client, regs, carros, facturas, unlocked, canEdit, onBack, onUnlock, onEdit }: {
   client: Usuario;
   regs: Reg[];
-  motos: Moto[];
+  carros: Carro[];
   facturas: Factura[];
   unlocked: boolean;
-  onBack: ()=>void;
-  onUnlock: (e:React.MouseEvent)=>void;
+  canEdit: boolean;
+  onBack: () => void;
+  onUnlock: (e: React.MouseEvent) => void;
+  onEdit: () => void;
 }) {
-  const [tab, setTab]               = useState<DetailTab>('servicios');
+  const [tab, setTab] = useState<DetailTab>('servicios');
   const [expandedFac, setExpandedFac] = useState<number | null>(null);
   const [facDetalles, setFacDetalles] = useState<Record<number, DetalleFactura[]>>({});
-  const [loadingFac, setLoadingFac]   = useState<number | null>(null);
+  const [loadingFac, setLoadingFac] = useState<number | null>(null);
 
-  const phone  = unlocked ? (client.telefono ?? extractPhone(client.descripcion))  : null;
+  const phone = unlocked ? (client.telefono ?? extractPhone(client.descripcion)) : null;
   const cedula = unlocked ? (client.cedula ?? extractCedula(client.descripcion)) : null;
-  const total  = regs.reduce((s,r)=>s+r.costo_total, 0);
-  const done   = regs.filter(r=>r.estado>=2).length;
-  const pending= regs.filter(r=>r.estado<2).length;
+  const total = regs.reduce((s, r) => s + r.costo_total, 0);
+  const done = regs.filter(r => r.estado >= 2).length;
+  const pending = regs.filter(r => r.estado < 2).length;
 
   /* ── Compras: toggle expand ── */
   const toggleFac = async (facId: number) => {
@@ -139,9 +141,9 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
   };
 
   const TABS: { id: DetailTab; label: string; icon: LucideIcon; count?: number }[] = [
-    { id:'servicios',   label:'Servicios',   icon:Wrench,  count:regs.length },
-    { id:'motos',       label:'Vehículos',       icon:Car,    count:motos.length },
-    { id:'compras',     label:'Compras',     icon:Package, count:facturas.length },
+    { id: 'servicios', label: 'Servicios', icon: Wrench, count: regs.length },
+    { id: 'carros', label: 'Vehículos', icon: Car, count: carros.length },
+    { id: 'compras', label: 'Compras', icon: Package, count: facturas.length },
   ];
 
   return (
@@ -165,7 +167,16 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
                   <h2 className="text-xl font-black dark:text-white/95 text-slate-900/95 leading-tight">{client.nombre_completo}</h2>
                   <p className="text-sm dark:text-white/30 text-slate-900/30 mt-0.5">@{client.nombre_usuario}</p>
                 </div>
-                <Badge variant="success">Cliente activo</Badge>
+                <div className="flex items-center gap-2">
+                  {canEdit && (
+                    <Button variant="secondary" size="sm" onClick={onEdit} icon={<Edit3 size={13} />}>
+                      Editar cliente
+                    </Button>
+                  )}
+                  <Badge variant={client.activo === false ? 'danger' : 'success'}>
+                    {client.activo === false ? 'Cuenta suspendida' : 'Cliente activo'}
+                  </Badge>
+                </div>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
@@ -183,7 +194,7 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
               <div className="mt-3">
                 {unlocked ? (
                   <div className="flex flex-wrap gap-x-5 gap-y-1.5 px-3 py-2.5 rounded-xl"
-                       style={{ background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.18)' }}>
+                    style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)' }}>
                     {cedula && (
                       <span className="flex items-center gap-1.5 text-[12px]">
                         <CreditCard size={11} className="text-gm-red" />
@@ -213,9 +224,9 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
                 ) : (
                   <button onClick={onUnlock}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all"
-                    style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.45)' }}
-                    onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.background='rgba(225,20,40,0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(225,20,40,0.25)'; (e.currentTarget as HTMLButtonElement).style.color='#E11428'; }}
-                    onMouseOut={e  => { (e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.05)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.10)'; (e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.45)'; }}>
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.45)' }}
+                    onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(225,20,40,0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(225,20,40,0.25)'; (e.currentTarget as HTMLButtonElement).style.color = '#E11428'; }}
+                    onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.10)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.45)'; }}>
                     <Shield size={12} />
                     Ver cédula, teléfono y dirección — requiere verificación
                   </button>
@@ -226,31 +237,29 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
 
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5 pt-5 border-t border-white/[0.05]">
-            <StatChip icon={Wrench}      label="Servicios"  value={regs.length}     color="#E11428" />
-            <StatChip icon={CheckCircle} label="Completos"  value={done}            color="#10B981" />
-            <StatChip icon={Clock}       label="Pendientes" value={pending}         color="#F59E0B" />
-            <StatChip icon={TrendingUp}  label="Gastado"    value={fmtMoney(total)} color="#8B5CF6" />
+            <StatChip icon={Wrench} label="Servicios" value={regs.length} color="#E11428" />
+            <StatChip icon={CheckCircle} label="Completos" value={done} color="#10B981" />
+            <StatChip icon={Clock} label="Pendientes" value={pending} color="#F59E0B" />
+            <StatChip icon={TrendingUp} label="Gastado" value={fmtMoney(total)} color="#8B5CF6" />
           </div>
         </div>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth:'none' }}>
+      <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
         {TABS.map(t => (
           <button key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-black whitespace-nowrap transition-all ${
-              tab === t.id
-                ? 'bg-gm-red text-white shadow-lg'
-                : 'dark:text-white/40 text-slate-900/40 hover:dark:text-white/70 text-slate-900/70 border border-white/[0.07]'
-            }`}
-            style={tab !== t.id ? { background:'rgba(255,255,255,0.03)' } : {}}>
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-black whitespace-nowrap transition-all ${tab === t.id
+              ? 'bg-gm-red text-white shadow-lg'
+              : 'dark:text-white/40 text-slate-900/40 hover:dark:text-white/70 text-slate-900/70 border border-white/[0.07]'
+              }`}
+            style={tab !== t.id ? { background: 'rgba(255,255,255,0.03)' } : {}}>
             <t.icon size={12} />
             {t.label}
             {t.count !== undefined && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                tab === t.id ? 'bg-white/20 text-white' : 'bg-white/[0.08] text-white/35'
-              }`}>{t.count}</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${tab === t.id ? 'bg-white/20 text-white' : 'bg-white/[0.08] text-white/35'
+                }`}>{t.count}</span>
             )}
           </button>
         ))}
@@ -272,12 +281,12 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
             <div className="space-y-2">
               {regs.map((r, i) => {
                 const est = ESTADO_REGISTRO[r.estado] ?? ESTADO_REGISTRO[0];
-                const v   = VARIANT_MAP[r.estado] ?? 'default';
+                const v = VARIANT_MAP[r.estado] ?? 'default';
                 return (
                   <div key={r.id || i}
-                       className="gm-card-d rounded-2xl p-4 flex items-center gap-4 hover:border-white/[0.10] transition-all">
+                    className="gm-card-d rounded-2xl p-4 flex items-center gap-4 hover:border-white/[0.10] transition-all">
                     <div className="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center text-[11px] font-black"
-                         style={{ background:'rgba(225,20,40,0.1)', color:'#E11428', border:'1px solid rgba(225,20,40,0.2)' }}>
+                      style={{ background: 'rgba(225,20,40,0.1)', color: '#E11428', border: '1px solid rgba(225,20,40,0.2)' }}>
                       {regs.length - i}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -321,31 +330,31 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
         </div>
       )}
 
-      {/* ── Tab: MOTOS ── */}
-      {tab === 'motos' && (
+      {/* ── Tab: CARROS ── */}
+      {tab === 'carros' && (
         <div>
           <p className="text-[10px] tracking-[0.3em] uppercase dark:text-white/20 text-slate-900/20 font-black mb-3 flex items-center gap-2">
             <Car size={10} className="text-gm-red" />
-            Motocicletas registradas ({motos.length})
+            Carros registrados ({carros.length})
           </p>
-          {motos.length === 0 ? (
+          {carros.length === 0 ? (
             <div className="gm-card-d rounded-2xl py-16 text-center">
               <Car size={28} className="mx-auto dark:text-white/10 text-slate-900/10 mb-3" />
               <p className="dark:text-white/25 text-slate-900/25 text-sm">Sin vehículos registrados</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {motos.map(m => (
+              {carros.map(m => (
                 <div key={m.id_vehiculo} className="gm-card-d rounded-2xl overflow-hidden">
                   <div className="h-[2px] bg-gradient-to-r from-blue-500/50 to-transparent" />
                   <div className="p-4 flex gap-4">
-                    {imagenMoto(m) ? (
-                      <img src={imagenMoto(m)!} alt={m.placa}
-                           className="w-20 h-16 rounded-xl object-cover shrink-0 border border-white/[0.08]" />
+                    {imagenCarro(m) ? (
+                      <img src={imagenCarro(m)!} alt={m.placa}
+                        className="w-20 h-16 rounded-xl object-cover shrink-0 border border-white/[0.08]" />
                     ) : (
                       <div className="w-20 h-16 rounded-xl shrink-0 flex items-center justify-center"
-                           style={{ background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
-                        <Car size={22} style={{ color:'#3B82F6' }} />
+                        style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
+                        <Car size={22} style={{ color: '#3B82F6' }} />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -389,18 +398,18 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
             <div className="space-y-2">
               {facturas
                 .slice()
-                .sort((a,b)=> toIsoStr(b.fecha_emision).localeCompare(toIsoStr(a.fecha_emision)))
+                .sort((a, b) => toIsoStr(b.fecha_emision).localeCompare(toIsoStr(a.fecha_emision)))
                 .map((f, i) => {
                   const isExpanded = expandedFac === f.id_factura;
-                  const detalles   = facDetalles[f.id_factura];
-                  const isLoading  = loadingFac === f.id_factura;
+                  const detalles = facDetalles[f.id_factura];
+                  const isLoading = loadingFac === f.id_factura;
                   return (
                     <div key={f.id_factura} className="gm-card-d rounded-2xl overflow-hidden">
                       <button
                         onClick={() => toggleFac(f.id_factura)}
                         className="w-full p-4 flex items-center gap-4 hover:bg-white/[0.02] transition-colors text-left">
                         <div className="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center text-[11px] font-black"
-                             style={{ background:'rgba(139,92,246,0.12)', color:'#8B5CF6', border:'1px solid rgba(139,92,246,0.22)' }}>
+                          style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.22)' }}>
                           {facturas.length - i}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -422,7 +431,7 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
                         <div className="border-t border-white/[0.05] px-4 pb-4 pt-3">
                           {isLoading ? (
                             <div className="space-y-2">
-                              {[1,2].map(k => (
+                              {[1, 2].map(k => (
                                 <div key={k} className="skeleton-d h-8 rounded-lg" />
                               ))}
                             </div>
@@ -437,25 +446,25 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/[0.04]">
-                                {detalles.map(d => (
-                                  <tr key={d.id_detalle}>
-                                    <td className="py-1.5 dark:text-white/70 text-slate-900/70">
-                                      {d.descripcion || `Producto #${d.id_producto}`}
-                                    </td>
-                                    <td className="py-1.5 text-center dark:text-white/40 text-slate-900/40">{d.cantidad}</td>
-                                    <td className="py-1.5 text-right font-bold dark:text-white/75 text-slate-900/75 tabular-nums">
-                                      {fmtMoney(d.subtotal)}
-                                    </td>
+                                  {detalles.map(d => (
+                                    <tr key={d.id_detalle}>
+                                      <td className="py-1.5 dark:text-white/70 text-slate-900/70">
+                                        {d.descripcion || `Producto #${d.id_producto}`}
+                                      </td>
+                                      <td className="py-1.5 text-center dark:text-white/40 text-slate-900/40">{d.cantidad}</td>
+                                      <td className="py-1.5 text-right font-bold dark:text-white/75 text-slate-900/75 tabular-nums">
+                                        {fmtMoney(d.subtotal)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="border-t border-white/[0.08]">
+                                    <td colSpan={2} className="pt-2 text-[11px] dark:text-white/30 text-slate-900/30 font-black uppercase tracking-wider">Total</td>
+                                    <td className="pt-2 text-right font-black text-purple-400 tabular-nums">{fmtMoney(f.costo_total)}</td>
                                   </tr>
-                                ))}
-                              </tbody>
-                              <tfoot>
-                                <tr className="border-t border-white/[0.08]">
-                                  <td colSpan={2} className="pt-2 text-[11px] dark:text-white/30 text-slate-900/30 font-black uppercase tracking-wider">Total</td>
-                                  <td className="pt-2 text-right font-black text-purple-400 tabular-nums">{fmtMoney(f.costo_total)}</td>
-                                </tr>
-                              </tfoot>
-                            </table>
+                                </tfoot>
+                              </table>
                             </div>
                           ) : (
                             <p className="text-[11px] dark:text-white/25 text-slate-900/25 italic">Sin detalles disponibles</p>
@@ -477,18 +486,18 @@ function HistoryPanel({ client, regs, motos, facturas, unlocked, onBack, onUnloc
 /* ═══ TARJETA CLIENTE ═════════════════════════ */
 function ClienteCard({ client, regs, unlocked, onSelect, onUnlock }: {
   client: Usuario; regs: Reg[]; unlocked: boolean;
-  onSelect: ()=>void; onUnlock: (e:React.MouseEvent)=>void;
+  onSelect: () => void; onUnlock: (e: React.MouseEvent) => void;
 }) {
-  const phone  = unlocked ? (client.telefono ?? extractPhone(client.descripcion))  : null;
+  const phone = unlocked ? (client.telefono ?? extractPhone(client.descripcion)) : null;
   const cedula = unlocked ? (client.cedula ?? extractCedula(client.descripcion)) : null;
-  const total  = regs.reduce((s,r)=>s+r.costo_total, 0);
-  const last   = regs[0] ?? null;
+  const total = regs.reduce((s, r) => s + r.costo_total, 0);
+  const last = regs[0] ?? null;
 
   return (
     <div
       onClick={onSelect}
       className="gm-card-d rounded-2xl overflow-hidden flex flex-col cursor-pointer group"
-      style={{ transition:'border-color 200ms, box-shadow 200ms, transform 200ms' }}
+      style={{ transition: 'border-color 200ms, box-shadow 200ms, transform 200ms' }}
     >
       <div className="h-[2px] bg-gradient-to-r from-gm-red/40 via-gm-red/20 to-transparent group-hover:from-gm-red/70 transition-all duration-300" />
 
@@ -503,7 +512,7 @@ function ClienteCard({ client, regs, unlocked, onSelect, onUnlock }: {
               <Badge variant="success">Cliente</Badge>
               {regs.length > 0 && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-gm-red/10 border border-gm-red/20 text-gm-red">
-                  {regs.length} visita{regs.length!==1?'s':''}
+                  {regs.length} visita{regs.length !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
@@ -549,9 +558,9 @@ function ClienteCard({ client, regs, unlocked, onSelect, onUnlock }: {
             <button
               onClick={onUnlock}
               className="flex items-center gap-1.5 text-[11px] font-semibold py-0.5 transition-colors"
-              style={{ color:'rgba(255,255,255,0.30)' }}
-              onMouseOver={e=>(e.currentTarget as HTMLButtonElement).style.color='#E11428'}
-              onMouseOut={e=>(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.30)'}>
+              style={{ color: 'rgba(255,255,255,0.30)' }}
+              onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.color = '#E11428'}
+              onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.30)'}>
               <Lock size={10} />
               Ver cédula y teléfono
             </button>
@@ -616,16 +625,17 @@ function SkeletonCard() {
 /* ═══ PÁGINA PRINCIPAL ════════════════════════ */
 export default function ClientesPage() {
   const toast = useToast();
-  const { user: me } = useAuth();
+  const { user: me, isAdmin } = useAuth();
+  const canEditClients = isAdmin || !!me?.permisos?.includes('recepcion');
 
-  const [clientes,    setClientes]    = useState<Usuario[]>([]);
-  const [regs,        setRegs]        = useState<Reg[]>([]);
-  const [motos,       setMotos]       = useState<Moto[]>([]);
-  const [facturas,    setFacturas]    = useState<Factura[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [search,      setSearch]      = useState('');
-  const [selected,    setSelected]         = useState<Usuario | null>(null);
-  const [pendingSelect, setPendingSelect]  = useState<Usuario | null>(null);
+  const [clientes, setClientes] = useState<Usuario[]>([]);
+  const [regs, setRegs] = useState<Reg[]>([]);
+  const [carros, setCarros] = useState<Carro[]>([]);
+  const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Usuario | null>(null);
+  const [pendingSelect, setPendingSelect] = useState<Usuario | null>(null);
 
   // Re-auth modal state for the entire page
   const navigate = useNavigate();
@@ -634,26 +644,39 @@ export default function ClientesPage() {
   useEffect(() => () => { verificationAttempt.current += 1; }, []);
 
   const [pageUnlocked, setPageUnlocked] = useState(false);
-  const [reAuthOpen,    setReAuthOpen]    = useState(false);
-  const [reAuthPwd,     setReAuthPwd]     = useState('');
+  const [reAuthOpen, setReAuthOpen] = useState(false);
+  const [reAuthPwd, setReAuthPwd] = useState('');
   const [reAuthLoading, setReAuthLoading] = useState(false);
   const [verificationError, setVerificationError] = useState('');
 
+  /* Edición y alta de cliente (RF-05 / RF-06) */
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    nombre_completo: '', cedula: '', telefono: '', correo: '', ciudad: '', direccion: '',
+  });
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    nombre_completo: '', nombre_usuario: '', correo: '', cedula: '', telefono: '', ciudad: 'Cuenca', direccion: '',
+  });
+  const [createdCreds, setCreatedCreds] = useState<{ nombreUsuario: string; contrasena: string } | null>(null);
+
   /* Ofertas / email masivo */
-  const [ofertaOpen,    setOfertaOpen]    = useState(false);
-  const [ofertaAsunto,  setOfertaAsunto]  = useState('');
+  const [ofertaOpen, setOfertaOpen] = useState(false);
+  const [ofertaAsunto, setOfertaAsunto] = useState('');
   const [ofertaMensaje, setOfertaMensaje] = useState('');
-  const [ofertaRoles,   setOfertaRoles]   = useState<number[]>([2]);
+  const [ofertaRoles, setOfertaRoles] = useState<number[]>([2]);
   const [ofertaLoading, setOfertaLoading] = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState('');
 
   const correosFiltrados = (() => {
     if (!tipoFiltro) return null;
     const duenosIds = new Set(
-      motos.filter(m => m.tipo_vehiculo === tipoFiltro).map(m => m.id_usuario)
+      carros.filter(m => m.tipo_vehiculo === tipoFiltro).map(m => m.id_usuario)
     );
     return clientes
-      .filter(c => duenosIds.has(c.id_usuario) && c.correo && !c.correo.endsWith('@gmotors.local'))
+      .filter(c => duenosIds.has(c.id_usuario) && c.correo && !c.correo.endsWith('@openmotors.local'))
       .map(c => c.correo!);
   })();
 
@@ -689,7 +712,7 @@ export default function ClientesPage() {
       const [uRes, rRes, mRes, fRes] = await Promise.allSettled([
         usuariosApi.list(),
         registrosApi.list(),
-        motosApi.list(),
+        carrosApi.list(),
         facturasApi.list(),
       ]);
       if (uRes.status === 'fulfilled') {
@@ -702,9 +725,9 @@ export default function ClientesPage() {
         }));
       }
       if (rRes.status === 'fulfilled') {
-        setRegs((rRes.value.data as Record<string,unknown>[]).map(normalizeReg));
+        setRegs((rRes.value.data as Record<string, unknown>[]).map(normalizeReg));
       }
-      if (mRes.status === 'fulfilled') setMotos(mRes.value.data as Moto[]);
+      if (mRes.status === 'fulfilled') setCarros(mRes.value.data as Carro[]);
       if (fRes.status === 'fulfilled') setFacturas(fRes.value.data as Factura[]);
     } catch { toast.error('Error cargando datos'); }
     finally { setLoading(false); }
@@ -727,8 +750,8 @@ export default function ClientesPage() {
   useEffect(() => {
     if (loading || selected) return;
     safeFromTo('.cl-card',
-      { y:20, opacity:0, scale:0.97 },
-      { y:0, opacity:1, scale:1, stagger:0.06, duration:0.45, ease:'power3.out', clearProps:'transform' }
+      { y: 20, opacity: 0, scale: 0.97 },
+      { y: 0, opacity: 1, scale: 1, stagger: 0.06, duration: 0.45, ease: 'power3.out', clearProps: 'transform' }
     );
   }, [loading, selected]);
 
@@ -736,8 +759,8 @@ export default function ClientesPage() {
   const regsOf = useCallback((nombre: string) =>
     regs.filter(r => r.nombre_cliente === nombre), [regs]);
 
-  const motosOf = useCallback((uid: number) =>
-    motos.filter(m => m.id_usuario === uid), [motos]);
+  const carrosOf = useCallback((uid: number) =>
+    carros.filter(m => m.id_usuario === uid), [carros]);
 
 
   const facturasOf = useCallback((uid: number) =>
@@ -749,8 +772,8 @@ export default function ClientesPage() {
     if (!q) return clientes;
     return clientes.filter(c => {
       const cedula = c.cedula ?? extractCedula(c.descripcion) ?? '';
-      const phone  = c.telefono ?? extractPhone(c.descripcion) ?? '';
-      const placas = motos.filter(m => m.id_usuario === c.id_usuario).map(m => m.placa.toLowerCase());
+      const phone = c.telefono ?? extractPhone(c.descripcion) ?? '';
+      const placas = carros.filter(m => m.id_usuario === c.id_usuario).map(m => m.placa.toLowerCase());
       return (
         c.nombre_completo.toLowerCase().includes(q) ||
         c.correo.toLowerCase().includes(q) ||
@@ -761,15 +784,15 @@ export default function ClientesPage() {
         placas.some(p => p.includes(q))
       );
     });
-  }, [clientes, search, motos]);
+  }, [clientes, search, carros]);
 
   /* KPIs */
-  const clienteNombres = useMemo(() => new Set(clientes.map(c=>c.nombre_completo)), [clientes]);
-  const totalVisitas = regs.filter(r=>clienteNombres.has(r.nombre_cliente)).length;
+  const clienteNombres = useMemo(() => new Set(clientes.map(c => c.nombre_completo)), [clientes]);
+  const totalVisitas = regs.filter(r => clienteNombres.has(r.nombre_cliente)).length;
   const now = new Date();
   const visitasMes = regs.filter(r => {
     const d = new Date(toIsoStr(r.fecha) + 'T00:00:00');
-    return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear() && clienteNombres.has(r.nombre_cliente);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && clienteNombres.has(r.nombre_cliente);
   }).length;
 
   /* Seleccionar cliente */
@@ -795,7 +818,7 @@ export default function ClientesPage() {
       toast.success('Identidad verificada');
       setReAuthOpen(false);
       setReAuthPwd('');
-      
+
       if (!pageUnlocked) {
         setPageUnlocked(true);
       } else if (pendingSelect) {
@@ -824,6 +847,76 @@ export default function ClientesPage() {
     if (!pageUnlocked) navigate(previousRoute ?? '/dashboard', { replace: true });
   };
 
+  const openEditModal = (c: Usuario) => {
+    setEditForm({
+      nombre_completo: c.nombre_completo ?? '',
+      cedula: c.cedula ?? extractCedula(c.descripcion) ?? '',
+      telefono: c.telefono ?? extractPhone(c.descripcion) ?? '',
+      correo: c.correo ?? '',
+      ciudad: c.ciudad ?? '',
+      direccion: c.direccion ?? '',
+    });
+    setEditOpen(true);
+  };
+
+  const handleSaveClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || editSaving) return;
+    if (!editForm.nombre_completo.trim()) { toast.error('El nombre completo es obligatorio'); return; }
+    if (!editForm.telefono.trim()) { toast.error('El teléfono es obligatorio'); return; }
+    setEditSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        nombre_completo: editForm.nombre_completo.trim(),
+        cedula: editForm.cedula.trim() || null,
+        telefono: editForm.telefono.trim(),
+        ciudad: editForm.ciudad.trim() || null,
+        direccion: editForm.direccion.trim() || null,
+      };
+      if (isAdmin && editForm.correo.trim()) {
+        payload.correo = editForm.correo.trim();
+      }
+      const { data } = await usuariosApi.update(selected.id_usuario, payload);
+      const updated = data as Usuario;
+      setClientes(prev => prev.map(u => u.id_usuario === updated.id_usuario ? updated : u));
+      setSelected(updated);
+      setEditOpen(false);
+      toast.success('Información del cliente actualizada');
+    } catch (err) {
+      toast.error(getErrorMsg(err) || 'Error al actualizar cliente');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (createSaving) return;
+    if (!createForm.nombre_completo.trim() || !createForm.nombre_usuario.trim() || !createForm.correo.trim()) {
+      toast.error('Nombre, usuario y correo son obligatorios');
+      return;
+    }
+    setCreateSaving(true);
+    try {
+      const { data } = await usuariosApi.createClient({
+        nombre_completo: createForm.nombre_completo.trim(),
+        nombre_usuario: createForm.nombre_usuario.trim(),
+        correo: createForm.correo.trim(),
+        cedula: createForm.cedula.trim() || undefined,
+        telefono: createForm.telefono.trim() || undefined,
+        ciudad: createForm.ciudad.trim() || undefined,
+        direccion: createForm.direccion.trim() || undefined,
+      });
+      setClientes(prev => [data.usuario, ...prev]);
+      setCreatedCreds(data.credencialTemporal);
+      toast.success('Cliente registrado correctamente');
+    } catch (err) {
+      toast.error(getErrorMsg(err) || 'Error al registrar cliente');
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
   /* ── RENDER ── */
   return (
     <div className="space-y-7 pb-10">
@@ -832,11 +925,13 @@ export default function ClientesPage() {
         <HistoryPanel
           client={selected}
           regs={regsOf(selected.nombre_completo)}
-          motos={motosOf(selected.id_usuario)}
+          carros={carrosOf(selected.id_usuario)}
           facturas={facturasOf(selected.id_usuario)}
           unlocked={true}
+          canEdit={canEditClients}
           onBack={() => setSelected(null)}
           onUnlock={(e) => openReAuth(selected, e)}
+          onEdit={() => openEditModal(selected)}
         />
       ) : (
         <>
@@ -851,26 +946,31 @@ export default function ClientesPage() {
                 {clientes.length} clientes · {totalVisitas} visitas en total
               </p>
             </div>
-            <button
-              onClick={() => setOfertaOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ background:'rgba(225,20,40,0.1)', color:'#E11428', border:'1px solid rgba(225,20,40,0.25)' }}
-            >
-              <Send size={14} /> Enviar oferta a clientes
-            </button>
+            {canEditClients && (
+              <Button
+                onClick={() => {
+                  setCreatedCreds(null);
+                  setCreateForm({ nombre_completo: '', nombre_usuario: '', correo: '', cedula: '', telefono: '', ciudad: 'Cuenca', direccion: '' });
+                  setCreateOpen(true);
+                }}
+                icon={<UserPlus size={14} />}
+              >
+                Nuevo cliente
+              </Button>
+            )}
           </div>
 
           {/* KPI strip */}
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label:'Total clientes',    value:clientes.length, icon:Users,      color:'#3B82F6' },
-              { label:'Visitas totales',   value:totalVisitas,    icon:Wrench,     color:'#E11428' },
-              { label:'Activos este mes',  value:visitasMes,      icon:TrendingUp, color:'#10B981' },
-            ].map(({ label, value, icon:Icon, color }) => (
+              { label: 'Total clientes', value: clientes.length, icon: Users, color: '#3B82F6' },
+              { label: 'Visitas totales', value: totalVisitas, icon: Wrench, color: '#E11428' },
+              { label: 'Activos este mes', value: visitasMes, icon: TrendingUp, color: '#10B981' },
+            ].map(({ label, value, icon: Icon, color }) => (
               <div key={label} className="gm-card-d rounded-2xl p-5">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                       style={{ background:`${color}18`, border:`1px solid ${color}28` }}>
+                    style={{ background: `${color}18`, border: `1px solid ${color}28` }}>
                     <Icon size={16} style={{ color }} />
                   </div>
                   <span className="text-[10px] dark:text-white/30 text-slate-900/30 font-black tracking-[0.15em] uppercase">{label}</span>
@@ -903,7 +1003,7 @@ export default function ClientesPage() {
           {/* Grid */}
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_,i) => <SkeletonCard key={i} />)}
+              {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-24 text-center flex flex-col items-center gap-4">
@@ -998,17 +1098,17 @@ export default function ClientesPage() {
         <div className="space-y-5">
           {/* Preview estadístico */}
           <div className="flex items-center gap-3 p-4 rounded-xl"
-               style={{ background:'rgba(225,20,40,0.06)', border:'1px solid rgba(225,20,40,0.15)' }}>
+            style={{ background: 'rgba(225,20,40,0.06)', border: '1px solid rgba(225,20,40,0.15)' }}>
             <Mail size={18} className="text-gm-red shrink-0" />
             <div>
               <p className="text-[12px] font-black dark:text-white/80 text-slate-900/80">
                 {correosFiltrados
                   ? `${correosFiltrados.length} clientes con vehículo de tipo ${tipoFiltro}`
-                  : `${clientes.filter(c => !c.correo?.endsWith('@gmotors.local') && ofertaRoles.includes(2)).length} clientes con correo real`
+                  : `${clientes.filter(c => !c.correo?.endsWith('@openmotors.local') && ofertaRoles.includes(2)).length} clientes con correo real`
                 }
               </p>
               <p className="text-[11px] dark:text-white/35 text-slate-900/35 mt-0.5">
-                Los correos @gmotors.local (seed) se omiten automáticamente
+                Los correos @openmotors.local (seed) se omiten automáticamente
               </p>
             </div>
           </div>
@@ -1018,8 +1118,8 @@ export default function ClientesPage() {
             <p className="text-[11px] font-black uppercase tracking-[0.15em] dark:text-white/35 text-slate-900/35 mb-2">Destinatarios</p>
             <div className="flex gap-2 flex-wrap">
               {[
-                { id: 2, label: 'Clientes',   color: '#3B82F6' },
-                { id: 3, label: 'Mecánicos',  color: '#10B981' },
+                { id: 2, label: 'Clientes', color: '#3B82F6' },
+                { id: 3, label: 'Mecánicos', color: '#10B981' },
               ].map(({ id, label, color }) => {
                 const active = ofertaRoles.includes(id);
                 return (
@@ -1029,8 +1129,8 @@ export default function ClientesPage() {
                     className="px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all"
                     style={{
                       background: active ? `${color}18` : 'rgba(255,255,255,0.04)',
-                      color:      active ? color          : 'rgba(255,255,255,0.35)',
-                      border:     `1px solid ${active ? `${color}35` : 'rgba(255,255,255,0.08)'}`,
+                      color: active ? color : 'rgba(255,255,255,0.35)',
+                      border: `1px solid ${active ? `${color}35` : 'rgba(255,255,255,0.08)'}`,
                     }}
                   >
                     {label}
@@ -1049,15 +1149,15 @@ export default function ClientesPage() {
                 className="px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all"
                 style={{
                   background: !tipoFiltro ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
-                  color:      !tipoFiltro ? '#F59E0B' : 'rgba(255,255,255,0.35)',
-                  border:     `1px solid ${!tipoFiltro ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  color: !tipoFiltro ? '#F59E0B' : 'rgba(255,255,255,0.35)',
+                  border: `1px solid ${!tipoFiltro ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`,
                 }}
               >
                 Todos
               </button>
               {VEHICLE_TYPES.map(tipo => {
                 const active = tipoFiltro === tipo;
-                const count = motos.filter(m => m.tipo_vehiculo === tipo).length;
+                const count = carros.filter(m => m.tipo_vehiculo === tipo).length;
                 return (
                   <button
                     key={tipo}
@@ -1065,8 +1165,8 @@ export default function ClientesPage() {
                     className="px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all"
                     style={{
                       background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
-                      color:      active ? '#F59E0B' : 'rgba(255,255,255,0.35)',
-                      border:     `1px solid ${active ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                      color: active ? '#F59E0B' : 'rgba(255,255,255,0.35)',
+                      border: `1px solid ${active ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`,
                     }}
                   >
                     {tipo} <span style={{ opacity: 0.6 }}>({count})</span>
@@ -1094,20 +1194,158 @@ export default function ClientesPage() {
               onChange={e => setOfertaMensaje(e.target.value)}
               className="w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-1"
               style={{
-                background:'rgba(255,255,255,0.04)',
-                border:'1px solid rgba(255,255,255,0.1)',
-                color:'rgba(255,255,255,0.8)',
-                lineHeight:'1.6',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.8)',
+                lineHeight: '1.6',
               }}
             />
           </div>
 
           <p className="text-[10px] dark:text-white/20 text-slate-900/20 leading-relaxed">
-            El email se envía con la plantilla oficial de Open Motors. Incluye el asunto como título
+            El email se envía con la plantilla oficial de OpenMotors. Incluye el asunto como título
             y un botón "Ver portal" al final. El sistema retoma intentos fallidos — si Render está dormido
             puede tardar hasta 60 s.
           </p>
         </div>
+      </Modal>
+
+      {/* ── Modal: Editar cliente (RF-06 / HU-08) ── */}
+      <Modal
+        open={editOpen}
+        onClose={() => { if (!editSaving) setEditOpen(false); }}
+        title="Editar información del cliente"
+        size="md"
+      >
+        <form onSubmit={handleSaveClient} className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Input
+              label="Nombre completo *"
+              value={editForm.nombre_completo}
+              onChange={e => setEditForm(f => ({ ...f, nombre_completo: e.target.value }))}
+              required
+            />
+            <Input
+              label="Cédula / RUC"
+              value={editForm.cedula}
+              onChange={e => setEditForm(f => ({ ...f, cedula: e.target.value }))}
+            />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Input
+              label="Teléfono / WhatsApp *"
+              value={editForm.telefono}
+              onChange={e => setEditForm(f => ({ ...f, telefono: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAdmin ? 'Correo electrónico *' : 'Correo electrónico (solo administrador)'}
+              type="email"
+              value={editForm.correo}
+              disabled={!isAdmin}
+              onChange={e => setEditForm(f => ({ ...f, correo: e.target.value }))}
+            />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Input
+              label="Ciudad"
+              value={editForm.ciudad}
+              onChange={e => setEditForm(f => ({ ...f, ciudad: e.target.value }))}
+            />
+            <Input
+              label="Dirección"
+              value={editForm.direccion}
+              onChange={e => setEditForm(f => ({ ...f, direccion: e.target.value }))}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={editSaving}>
+              Guardar cambios
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Modal: Registrar nuevo cliente (RF-05 / HU-06) ── */}
+      <Modal
+        open={createOpen}
+        onClose={() => { if (!createSaving) setCreateOpen(false); }}
+        title="Registrar nuevo cliente"
+        size="md"
+      >
+        {createdCreds ? (
+          <div className="space-y-4">
+            <p className="text-sm dark:text-white/80 text-slate-800">
+              Cliente registrado exitosamente. Entrega estas credenciales de acceso al portal:
+            </p>
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1 font-mono text-sm">
+              <p><strong>Usuario:</strong> {createdCreds.nombreUsuario}</p>
+              <p><strong>Clave temporal:</strong> <span className="text-emerald-400 font-bold select-all">{createdCreds.contrasena}</span></p>
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => setCreateOpen(false)}>Listo</Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleCreateClient} className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Input
+                label="Nombre completo *"
+                value={createForm.nombre_completo}
+                onChange={e => setCreateForm(f => ({ ...f, nombre_completo: e.target.value }))}
+                required
+              />
+              <Input
+                label="Usuario *"
+                value={createForm.nombre_usuario}
+                onChange={e => setCreateForm(f => ({ ...f, nombre_usuario: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Input
+                label="Correo electrónico *"
+                type="email"
+                value={createForm.correo}
+                onChange={e => setCreateForm(f => ({ ...f, correo: e.target.value }))}
+                required
+              />
+              <Input
+                label="Teléfono / WhatsApp"
+                value={createForm.telefono}
+                onChange={e => setCreateForm(f => ({ ...f, telefono: e.target.value }))}
+              />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Input
+                label="Cédula / RUC"
+                value={createForm.cedula}
+                onChange={e => setCreateForm(f => ({ ...f, cedula: e.target.value }))}
+              />
+              <Input
+                label="Ciudad"
+                value={createForm.ciudad}
+                onChange={e => setCreateForm(f => ({ ...f, ciudad: e.target.value }))}
+              />
+            </div>
+            <Input
+              label="Dirección"
+              value={createForm.direccion}
+              onChange={e => setCreateForm(f => ({ ...f, direccion: e.target.value }))}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)} disabled={createSaving}>
+                Cancelar
+              </Button>
+              <Button type="submit" loading={createSaving}>
+                <UserPlus size={14} /> Registrar cliente
+              </Button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

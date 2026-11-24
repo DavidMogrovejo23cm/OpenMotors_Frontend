@@ -1,316 +1,204 @@
-/* ─────────────────────────────────────────────
-   GMotors — Módulo de Pagos
-   3 secciones: En taller · Por cobrar · Cobrado
-   ───────────────────────────────────────────── */
-
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  CreditCard, Clock, CheckCircle, AlertCircle,
-  FileText, ChevronRight, Search, Banknote, Receipt,
-  TrendingUp,
-} from 'lucide-react';
-import { registrosApi } from '../../lib/api';
-import { fmtMoney, fmtDate } from '../../lib/utils';
-import { useAuth } from '../../contexts/AuthContext';
+import { finanzasApi, registrosApi, type DeudaClienteItem, type DeudaClienteOrden } from '../../lib/api';
+import { ESTADO_REGISTRO, fmtMoney, fmtDate, getErrorMsg } from '../../lib/utils';
+import { useToast } from '../../components/ui/Toast';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
 import type { RegistroDetalle } from '../../types';
 
-const TABS = [
-  {
-    key:    'activo',
-    label:  'En taller',
-    estados: [0, 1, 2],
-    color:  '#3B82F6',
-    icon:   Clock,
-    desc:   'Órdenes activas en proceso',
-  },
-  {
-    key:    'cobrar',
-    label:  'Por cobrar',
-    estados: [3],
-    color:  '#F59E0B',
-    icon:   AlertCircle,
-    desc:   'Entregados · pendiente de pago',
-  },
-  {
-    key:    'cobrado',
-    label:  'Cobrado',
-    estados: [4],
-    color:  '#10B981',
-    icon:   CheckCircle,
-    desc:   'Facturados y pagados',
-  },
-] as const;
-
-type TabKey = typeof TABS[number]['key'];
-
-const ESTADO_COLOR: Record<number, string> = {
-  0: '#F59E0B', 1: '#3B82F6', 2: '#10B981', 3: '#8B5CF6', 4: '#14B8A6',
-};
-const ESTADO_LABEL = ['Pendiente', 'En proceso', 'Completado', 'Entregado', 'Facturado'];
-
-function SkeletonRow() {
-  return (
-    <tr>
-      {[50, 80, 130, 120, 90, 80, 60, 60].map((w, i) => (
-        <td key={i} className="px-4 py-3.5">
-          <div className="skeleton-d h-3.5 rounded-md" style={{ width: w }} />
-        </td>
-      ))}
-    </tr>
-  );
-}
-
+const PAGO_LABEL = { PENDIENTE: 'Pendiente', PARCIAL: 'Parcial', PAGADO: 'Pagado' };
 export default function PagosPage() {
-  const { isAdmin } = useAuth();
-
+  const toast = useToast();
+  const [vista, setVista] = useState<'ordenes' | 'deudas'>('ordenes');
   const [registros, setRegistros] = useState<RegistroDetalle[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>('activo');
-  const [search,    setSearch]    = useState('');
+  const [deudasClientes, setDeudasClientes] = useState<DeudaClienteItem[]>([]);
+  const [carteraPendiente, setCarteraPendiente] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [pagoFiltro, setPagoFiltro] = useState('TODOS');
+  const [trabajoFiltro, setTrabajoFiltro] = useState('TODOS');
+  const [target, setTarget] = useState<{
+    id_registro: number;
+    placa: string;
+    costo_total: number;
+    saldo_pendiente?: number;
+    pagos?: { id_pago: number; monto: number; fecha: string; metodo: string }[];
+  } | null>(null);
+  const [monto, setMonto] = useState('');
+  const [metodo, setMetodo] = useState('EFECTIVO');
+  const [referencia, setReferencia] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [idOperacion, setIdOperacion] = useState('');
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const cargar = useCallback(async () => {
+    setLoading(true); setError('');
     try {
-      const { data } = await registrosApi.list();
-      setRegistros(Array.isArray(data) ? data : []);
-    } catch { /* render dormido */ }
+      const [regRes, deuRes] = await Promise.all([
+        registrosApi.list(),
+        finanzasApi.deudas().catch(() => ({ data: { total_cartera_pendiente: 0, clientes: [] } })),
+      ]);
+      setRegistros(regRes.data);
+      setDeudasClientes(deuRes.data.clientes ?? []);
+      setCarteraPendiente(deuRes.data.total_cartera_pendiente ?? 0);
+    } catch (err) { setError(getErrorMsg(err)); }
     finally { setLoading(false); }
   }, []);
+  useEffect(() => { cargar(); }, [cargar]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const filtered = useMemo(() => registros.filter(r =>
+    (pagoFiltro === 'TODOS' || r.estado_pago === pagoFiltro) &&
+    (trabajoFiltro === 'TODOS' || r.estado === Number(trabajoFiltro)) &&
+    `${r.placa} ${r.nombre_cliente} ${r.tipo_servicio}`.toLowerCase().includes(search.toLowerCase().trim())
+  ), [registros, pagoFiltro, trabajoFiltro, search]);
 
-  const tab = TABS.find(t => t.key === activeTab)!;
-
-  const filtered = useMemo(() => {
+  const deudasFiltradas = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return registros
-      .filter(r => (tab.estados as readonly number[]).includes(r.estado))
-      .filter(r =>
-        !q ||
-        (r.placa?.toLowerCase().includes(q)) ||
-        (r.nombre_cliente?.toLowerCase().includes(q)) ||
-        (r.tipo_servicio?.toLowerCase().includes(q))
-      );
-  }, [registros, tab, search]);
+    if (!q) return deudasClientes;
+    return deudasClientes.filter(c =>
+      `${c.nombre_cliente} ${c.cedula ?? ''} ${c.ordenes.map(o => o.placa).join(' ')}`.toLowerCase().includes(q)
+    );
+  }, [deudasClientes, search]);
 
-  const sums = useMemo(() => {
-    const result = {} as Record<TabKey, { count: number; total: number }>;
-    TABS.forEach(t => {
-      const group = registros.filter(r => (t.estados as readonly number[]).includes(r.estado));
-      result[t.key] = {
-        count: group.length,
-        total: group.reduce((s, r) => s + (r.costo_total ?? 0), 0),
-      };
-    });
-    return result;
-  }, [registros]);
+  const cobrado = registros.reduce((s, r) => s + (r.monto_pagado ?? 0), 0);
+  const pendiente = registros.reduce((s, r) => s + (r.saldo_pendiente ?? r.costo_total), 0);
 
-  const filteredTotal = useMemo(
-    () => filtered.reduce((s, r) => s + (r.costo_total ?? 0), 0),
-    [filtered]
-  );
+  const abrirModalPago = (ord: RegistroDetalle | DeudaClienteOrden) => {
+    setTarget(ord);
+    setMonto(String(ord.saldo_pendiente ?? ord.costo_total));
+    setMetodo('EFECTIVO');
+    setReferencia('');
+    setIdOperacion(crypto.randomUUID());
+  };
 
-  const colSpan = isAdmin ? 8 : 7;
+  const pagar = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!target || saving) return;
+    setSaving(true);
+    try {
+      await registrosApi.pagar(target.id_registro, Number(monto), metodo, referencia || undefined, idOperacion);
+      setTarget(null);
+      toast.success('Pago registrado');
+      await cargar();
+    } catch (err) { toast.error(getErrorMsg(err)); }
+    finally { setSaving(false); }
+  };
 
-  return (
-    <div className="space-y-6 pb-8">
-
-      {/* ─── Header ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-2">
-        <div>
-          <p className="text-[10px] tracking-[0.35em] uppercase dark:text-white/25 text-slate-900/25 font-semibold mb-2 flex items-center gap-2">
-            <CreditCard size={10} className="text-gm-red" /> Facturación · Cobros
-          </p>
-          <h1 className="text-[1.9rem] font-black dark:text-white text-slate-900 leading-tight tracking-tight">
-            Módulo de <span className="text-gradient-red">Pagos</span>
-          </h1>
-          <p className="dark:text-white/35 text-slate-900/35 text-sm mt-1">{registros.length} órdenes en total</p>
-        </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl"
-               style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
-            <TrendingUp size={14} className="text-emerald-400" />
-            <div>
-              <p className="text-[10px] text-emerald-400/60 font-bold uppercase tracking-wider">Total cobrado</p>
-              <p className="text-base font-black text-emerald-400">{fmtMoney(sums.cobrado.total)}</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ─── KPI Tabs cards (Solo Desktop) ─── */}
-      <div className="hidden sm:grid grid-cols-3 gap-4">
-        {TABS.map(t => {
-          const s      = sums[t.key];
-          const active = activeTab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className="gm-card-d rounded-2xl p-5 text-left transition-all duration-200 hover:-translate-y-1 w-full"
-              style={{
-                borderColor:  active ? `${t.color}50` : 'rgba(255,255,255,0.05)',
-                boxShadow:    active ? `0 0 0 1px ${t.color}20, 0 0 40px ${t.color}10` : 'none',
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                       style={{ background: `${t.color}15`, border: `1px solid ${t.color}25` }}>
-                    <t.icon size={14} style={{ color: t.color }} />
-                  </div>
-                  <span className="text-[10px] tracking-[0.2em] uppercase font-black"
-                        style={{ color: `${t.color}cc` }}>{t.label}</span>
-                </div>
-                <span className="text-[22px] font-black" style={{ color: t.color }}>{s.count}</span>
-              </div>
-              {isAdmin
-                ? <p className="text-2xl font-black" style={{ color: t.color }}>{fmtMoney(s.total)}</p>
-                : <p className="text-base font-bold dark:text-white/50 text-slate-900/50">{s.count} {s.count === 1 ? 'orden' : 'órdenes'}</p>
-              }
-              <p className="text-[11px] dark:text-white/25 text-slate-900/25 mt-1">{t.desc}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ─── Tabs bar (Solo Mobile) ─── */}
-      <div className="flex sm:hidden gap-1 bg-white/[0.03] rounded-xl p-1 border border-white/[0.05] overflow-x-auto snap-x">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-[12px] font-bold transition-all duration-150"
-            style={{
-              background:   activeTab === t.key ? `${t.color}18` : 'transparent',
-              color:        activeTab === t.key ? t.color : 'rgba(255,255,255,0.35)',
-              borderBottom: activeTab === t.key ? `2px solid ${t.color}` : '2px solid transparent',
-            }}
-          >
-            <t.icon size={12} />
-            {t.label}
-            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black"
-                  style={{ background: `${t.color}20`, color: t.color }}>
-              {sums[t.key].count}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* ─── Búsqueda ─── */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/30 text-slate-900/30" />
-          <input
-            className="gm-input-d pl-9 w-full"
-            placeholder="Buscar placa, cliente o servicio..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <span className="text-[11px] dark:text-white/25 text-slate-900/25">{filtered.length} resultado(s)</span>
-      </div>
-
-      {/* ─── Tabla ─── */}
-      <div className="gm-card-d rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto dark-scroll">
-          <table className="gm-table-d">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Placa</th>
-                <th className="hidden sm:table-cell">Cliente</th>
-                <th className="hidden md:table-cell">Servicio</th>
-                <th>Estado</th>
-                {isAdmin && <th>Total</th>}
-                <th className="hidden lg:table-cell">Fecha</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading
-                ? Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
-                : filtered.length === 0
-                  ? (
-                    <tr>
-                      <td colSpan={colSpan}>
-                        <div className="py-16 text-center">
-                          <Receipt size={32} className="dark:text-white/12 text-slate-900/12 mx-auto mb-3" />
-                          <p className="text-sm font-bold dark:text-white/30 text-slate-900/30">Sin registros en esta sección</p>
-                          <p className="text-[11px] dark:text-white/18 text-slate-900/18 mt-1">
-                            {search ? 'Intenta con otra búsqueda' : 'No hay órdenes con este estado'}
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                  : filtered.map(r => (
-                    <tr key={r.id_registro}>
-                      <td>
-                        <span className="font-mono text-[11px] dark:text-white/35 text-slate-900/35">#{r.id_registro}</span>
-                      </td>
-                      <td>
-                        <span className="font-black dark:text-white/85 text-slate-900/85 tracking-wide">{r.placa}</span>
-                      </td>
-                      <td className="hidden sm:table-cell">
-                        <span className="dark:text-white/60 text-slate-900/60 text-[12px]">{r.nombre_cliente}</span>
-                      </td>
-                      <td className="hidden md:table-cell">
-                        <span className="dark:text-white/50 text-slate-900/50 text-[12px] truncate max-w-[150px] block">{r.tipo_servicio}</span>
-                      </td>
-                      <td>
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black whitespace-nowrap"
-                          style={{ background: `${ESTADO_COLOR[r.estado]}18`, color: ESTADO_COLOR[r.estado] }}
-                        >
-                          {ESTADO_LABEL[r.estado]}
-                        </span>
-                      </td>
-                      {isAdmin && (
-                        <td className="font-bold dark:text-white/80 text-slate-900/80 tabular-nums text-sm">
-                          {fmtMoney(r.costo_total ?? 0)}
-                        </td>
-                      )}
-                      <td className="hidden lg:table-cell dark:text-white/30 text-slate-900/30 text-[11px] tabular-nums whitespace-nowrap">
-                        {fmtDate(r.fecha as unknown as string)}
-                      </td>
-                      <td>
-                        {r.estado === 4 ? (
-                          <Link
-                            to={`/invoice/${r.id_registro}`}
-                            className="flex items-center gap-1 text-[11px] font-bold text-gm-red hover:text-gm-red-lt transition-colors whitespace-nowrap"
-                          >
-                            <FileText size={11} /> Factura <ChevronRight size={9} />
-                          </Link>
-                        ) : (
-                          <span className="text-[11px] dark:text-white/20 text-slate-900/20">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-              }
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer con total */}
-        {!loading && filtered.length > 0 && (
-          <div className="border-t border-white/[0.05] px-5 py-3 flex items-center justify-between">
-            <span className="text-[11px] dark:text-white/30 text-slate-900/30 font-bold">
-              {filtered.length} {filtered.length === 1 ? 'registro' : 'registros'} · {tab.label}
-            </span>
-            {isAdmin && (
-              <div className="flex items-center gap-2">
-                <Banknote size={12} style={{ color: tab.color }} />
-                <span className="text-sm font-black" style={{ color: tab.color }}>
-                  {fmtMoney(filteredTotal)}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+  return <div className="space-y-6 pb-8">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h1 className="text-2xl font-bold">Pagos y cuentas por cobrar</h1>
+      <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-white/10">
+        <button
+          type="button"
+          onClick={() => setVista('ordenes')}
+          className={`px-3.5 py-2 text-xs font-bold ${vista === 'ordenes' ? 'bg-gm-red text-white' : 'opacity-65'}`}
+        >
+          Por órdenes
+        </button>
+        <button
+          type="button"
+          onClick={() => setVista('deudas')}
+          className={`px-3.5 py-2 text-xs font-bold ${vista === 'deudas' ? 'bg-gm-red text-white' : 'opacity-65'}`}
+        >
+          Deudas por cliente ({deudasClientes.length})
+        </button>
       </div>
     </div>
-  );
+
+    <div className="grid gap-4 sm:grid-cols-3">
+      <div className="gm-card-d rounded-xl p-5">Total cobrado <strong className="block text-xl text-emerald-400">{fmtMoney(cobrado)}</strong></div>
+      <div className="gm-card-d rounded-xl p-5">Saldo pendiente global <strong className="block text-xl text-amber-400">{fmtMoney(vista === 'deudas' ? carteraPendiente : pendiente)}</strong></div>
+      <div className="gm-card-d rounded-xl p-5">Clientes con saldo <strong className="block text-xl">{deudasClientes.length}</strong></div>
+    </div>
+
+    <div className="flex flex-wrap gap-3">
+      <label>Buscar<input className="gm-input-d block" value={search} onChange={e => setSearch(e.target.value)} placeholder="Placa, cliente o cédula" /></label>
+      {vista === 'ordenes' && (
+        <>
+          <label>Pago<select className="gm-input-d block" value={pagoFiltro} onChange={e => setPagoFiltro(e.target.value)}>
+            <option value="TODOS">Todos</option>{Object.entries(PAGO_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select></label>
+          <label>Trabajo<select className="gm-input-d block" value={trabajoFiltro} onChange={e => setTrabajoFiltro(e.target.value)}>
+            <option value="TODOS">Todos</option>{Object.entries(ESTADO_REGISTRO).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
+          </select></label>
+        </>
+      )}
+    </div>
+
+    {error && <div role="alert">{error} <Button onClick={cargar}>Reintentar</Button></div>}
+
+    {loading ? <p role="status">Cargando pagos…</p> : vista === 'deudas' ? (
+      <div className="space-y-4">
+        {!deudasFiltradas.length ? (
+          <div className="gm-card-d rounded-xl p-8 text-center opacity-70">
+            No existen saldos pendientes registrados para la consulta actual.
+          </div>
+        ) : deudasFiltradas.map(cli => (
+          <div key={cli.id_cliente} className="gm-card-d rounded-xl p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
+              <div>
+                <h2 className="text-lg font-bold">{cli.nombre_cliente}</h2>
+                <p className="text-xs opacity-60">
+                  {cli.cedula ? `CI: ${cli.cedula} · ` : ''}{cli.telefono ? `Tel: ${cli.telefono} · ` : ''}{cli.cantidad_ordenes} orden(es) pendiente(s)
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs opacity-60">Saldo total adeudado</p>
+                <p className="text-xl font-black text-amber-400">{fmtMoney(cli.saldo_total_pendiente)}</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="gm-table-d">
+                <thead>
+                  <tr><th>Orden</th><th>Fecha</th><th>Vehículo</th><th>Servicio</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                  {cli.ordenes.map(o => (
+                    <tr key={o.id_registro}>
+                      <td><Link to={`/ordenes/${o.id_registro}`} className="font-bold text-gm-red">#{o.id_registro}</Link></td>
+                      <td className="text-xs">{fmtDate(o.fecha)}</td>
+                      <td>{o.placa} · {o.marca_vehiculo}</td>
+                      <td>{o.tipo_servicio}</td>
+                      <td>{fmtMoney(o.costo_total)}</td>
+                      <td>{fmtMoney(o.monto_pagado)}</td>
+                      <td className="font-bold text-amber-400">{fmtMoney(o.saldo_pendiente)}</td>
+                      <td>
+                        <Button size="sm" onClick={() => abrirModalPago(o)}>Registrar abono</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="gm-card-d rounded-xl overflow-x-auto">
+        <table className="gm-table-d"><thead><tr><th>Orden / cliente</th><th>Trabajo</th><th>Pago</th><th>Total</th><th>Cobrado</th><th>Saldo</th><th>Acción</th></tr></thead>
+          <tbody>{filtered.map(r => <tr key={r.id_registro}>
+            <td>#{r.id_registro} · {r.placa}<small className="block">{r.nombre_cliente}</small>{r.revision_estado && <small className="block text-amber-500">Estado histórico por revisar</small>}</td>
+            <td>{ESTADO_REGISTRO[r.estado]?.label}</td><td>{PAGO_LABEL[r.estado_pago ?? 'PENDIENTE']}</td>
+            <td>{fmtMoney(r.costo_total)}</td><td>{fmtMoney(r.monto_pagado ?? 0)}</td><td>{fmtMoney(r.saldo_pendiente ?? r.costo_total)}</td>
+            <td><div className="flex flex-wrap gap-2"><Link to={`/invoice/${r.id_registro}`}>Comprobante</Link>
+              {(r.saldo_pendiente ?? r.costo_total) > 0 && <Button onClick={() => abrirModalPago(r)}>Registrar pago</Button>}
+            </div></td>
+          </tr>)}{!filtered.length && <tr><td colSpan={7}>No hay órdenes para estos filtros.</td></tr>}</tbody>
+        </table>
+      </div>
+    )}
+
+    <Modal open={!!target} onClose={() => { if (!saving) setTarget(null); }} title="Registrar pago">
+      <form onSubmit={pagar} className="space-y-4">
+        <p>{target?.placa} · Saldo: {fmtMoney(target?.saldo_pendiente ?? target?.costo_total ?? 0)}</p>
+        <label className="block">Monto<input className="gm-input-d block w-full" required type="number" min="0.01" step="0.01" max={target?.saldo_pendiente ?? target?.costo_total} value={monto} onChange={e => setMonto(e.target.value)} /></label>
+        <label className="block">Método<select className="gm-input-d block w-full" value={metodo} onChange={e => setMetodo(e.target.value)}><option>EFECTIVO</option><option>TRANSFERENCIA</option><option>TARJETA</option></select></label>
+        <label className="block">Referencia<input className="gm-input-d block w-full" maxLength={100} value={referencia} onChange={e => setReferencia(e.target.value)} /></label>
+        <p className="text-sm">El pago se registra sin cambiar el estado del trabajo.</p>
+        <Button type="submit" loading={saving}>Confirmar pago</Button>
+      </form>
+      {!!target?.pagos?.length && <div className="mt-4"><h2>Pagos anteriores</h2>{target.pagos.map(p => <p key={p.id_pago}>{fmtDate(p.fecha)} · {p.metodo} · {fmtMoney(p.monto)}</p>)}</div>}
+    </Modal>
+  </div>;
 }

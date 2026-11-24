@@ -1,7 +1,7 @@
 import { VEHICLE_TYPES } from '../../lib/constants';
 /* ─────────────────────────────────────────────
-   GMotors — Mi Moto (vista cliente)
-   Muestra las motos del cliente o formulario para registrar la primera.
+   OpenMotors — Mi Carro (vista cliente)
+   Muestra los carros del cliente o formulario para registrar la primera.
    Incluye sección para completar datos personales (cédula / teléfono).
    ───────────────────────────────────────────── */
 
@@ -14,20 +14,20 @@ import {
   CheckCircle, Pencil, X, Save,
   Gauge, Activity,
 } from 'lucide-react';
-import { motosApi, usuariosApi, mantenimientosApi } from '../../lib/api';
+import { carrosApi, usuariosApi, mantenimientosApi } from '../../lib/api';
 import { usePolling } from '../../hooks/usePolling';
-import { comprimirImagen, imagenMoto } from '../../lib/fotos';
+import { comprimirImagen, imagenCarro } from '../../lib/fotos';
 import { esNativo, tomarFotoNativa } from '../../lib/camara';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../lib/theme';
 import { useToast } from '../../components/ui/Toast';
 import { getErrorMsg } from '../../lib/utils';
 import Input from '../../components/ui/Input';
-import type { Moto } from '../../types';
-import { EstadoMotoLive } from '../../components/mantenimiento/EstadoMantenimiento';
+import type { Carro } from '../../types';
+import { EstadoCarroLive } from '../../components/mantenimiento/EstadoMantenimiento';
 import { calcularEstadoLocal } from '../../lib/mantenimiento';
 
-/* ─── Tipos de moto usados en Ecuador (igual que MotosPage) ─── */
+/* ─── Tipos de carro usados en Ecuador (igual que CarrosPage) ─── */
 const TIPOS = VEHICLE_TYPES;
 
 const TIPO_COLOR: Record<string, string> = {
@@ -35,8 +35,8 @@ const TIPO_COLOR: Record<string, string> = {
   Todoterreno: '#00E676', Touring: '#00C9FF', Otro: '#8A8A9E',
 };
 
-/* ─── Schema formulario moto ─── */
-const motoSchema = z.object({
+/* ─── Schema formulario carro ─── */
+const carroSchema = z.object({
   placa:       z.string().min(6, 'Mínimo 6 caracteres').transform(v => v.toUpperCase()),
   anio:        z.coerce.number().int().min(1980, 'Año desde 1980').max(new Date().getFullYear() + 1, 'Año inválido'),
   marca:       z.string().min(2, 'Ingresa la marca'),
@@ -45,7 +45,7 @@ const motoSchema = z.object({
   tipo_vehiculo:   z.string().min(1, 'Selecciona el tipo'),
   kilometraje: z.coerce.number().int().nonnegative('Ingresa los kilómetros'),
 });
-type MotoForm = z.infer<typeof motoSchema>;
+type CarroForm = z.infer<typeof carroSchema>;
 
 /* ─── Schema perfil personal ─── */
 const perfilSchema = z.object({
@@ -57,16 +57,16 @@ const perfilSchema = z.object({
 type PerfilForm = z.infer<typeof perfilSchema>;
 
 /* ══════════════════════════════════════════════════════════════ */
-export default function MiMotoPage() {
+export default function MiCarroPage() {
   const { user }   = useAuth();
   const toast      = useToast();
   const [theme]    = useTheme();
   const isDark     = theme === 'dark';
 
-  const [motos,        setMotos]       = useState<Moto[]>([]);
-  const [loadingMotos, setLoadingMotos] = useState(true);
-  const [addingMoto,   setAddingMoto]  = useState(false);
-  const [savingMoto,   setSavingMoto]  = useState(false);
+  const [carros,        setCarros]       = useState<Carro[]>([]);
+  const [loadingCarros, setLoadingCarros] = useState(true);
+  const [addingCarro,   setAddingCarro]  = useState(false);
+  const [savingCarro,   setSavingCarro]  = useState(false);
 
   const [photoFile,    setPhotoFile]   = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -80,12 +80,12 @@ export default function MiMotoPage() {
   /* Override local de los datos personales recién guardados.
      El AuthContext no expone setUser, así que tras guardar el perfil el
      `user.descripcion` en memoria queda viejo y `perfilOk` seguiría en false,
-     trabando el registro de la moto. Con este override la UI refleja al
+     trabando el registro del carro. Con este override la UI refleja al
      instante la cédula/teléfono recién guardados sin recargar la página. */
   const [perfilLocal, setPerfilLocal] = useState<{ cedula: string; telefono: string; direccion: string } | null>(null);
 
   /* Actualización de km */
-  const [kmMoto,       setKmMoto]       = useState<Record<number, string>>({});
+  const [kmCarro,       setKmCarro]       = useState<Record<number, string>>({});
   const [savingKm,     setSavingKm]     = useState<number | null>(null);
   const [uploadMsg,    setUploadMsg]    = useState<string | null>(null);
   const [serviciosMap, setServiciosMap] = useState<Record<number, Record<string, number>>>({});
@@ -103,11 +103,11 @@ export default function MiMotoPage() {
   const perfilOk = !!cedula && !!telefono && !!nombreCompleto;
 
   const {
-    register: regMoto,
-    handleSubmit: handleMoto,
-    reset: resetMoto,
-    formState: { errors: errMoto },
-  } = useForm<MotoForm>({ resolver: zodResolver(motoSchema) as Resolver<MotoForm> });
+    register: regCarro,
+    handleSubmit: handleCarro,
+    reset: resetCarro,
+    formState: { errors: errCarro },
+  } = useForm<CarroForm>({ resolver: zodResolver(carroSchema) as Resolver<CarroForm> });
 
   const {
     register: regPerfil,
@@ -118,21 +118,21 @@ export default function MiMotoPage() {
     defaultValues: { nombre_completo: nombreCompleto, cedula: cedula || '', telefono: telefono || '', direccion: direccion || '' }
   });
 
-  const cargarMotos = useCallback(async (silent = false) => {
+  const cargarCarros = useCallback(async (silent = false) => {
     if (!user?.id_usuario) return;
-    if (!silent) setLoadingMotos(true);
+    if (!silent) setLoadingCarros(true);
     try {
-      const { data } = await motosApi.byUser(user.id_usuario);
-      const lista = Array.isArray(data) ? data as Moto[] : [];
-      setMotos(lista);
-      setKmMoto(prev => {
+      const { data } = await carrosApi.byUser(user.id_usuario);
+      const lista = Array.isArray(data) ? data as Carro[] : [];
+      setCarros(lista);
+      setKmCarro(prev => {
         const next = { ...prev };
         lista.forEach(m => {
           if (next[m.id_vehiculo] === undefined) next[m.id_vehiculo] = String(m.kilometraje);
         });
         return next;
       });
-      const res = await Promise.allSettled(lista.map(m => mantenimientosApi.byMoto(m.id_vehiculo)));
+      const res = await Promise.allSettled(lista.map(m => mantenimientosApi.byCarro(m.id_vehiculo)));
       const map: Record<number, Record<string, number>> = {};
       res.forEach((r, i) => {
         if (r.status === 'fulfilled') {
@@ -144,20 +144,20 @@ export default function MiMotoPage() {
         }
       });
       setServiciosMap(map);
-    } catch { setMotos([]); }
-    finally { if (!silent) setLoadingMotos(false); }
+    } catch { setCarros([]); }
+    finally { if (!silent) setLoadingCarros(false); }
   }, [user?.id_usuario]);
 
-  useEffect(() => { cargarMotos(false); }, [cargarMotos]);
-  usePolling(() => cargarMotos(true), { intervalMs: 30_000 });
+  useEffect(() => { cargarCarros(false); }, [cargarCarros]);
+  usePolling(() => cargarCarros(true), { intervalMs: 30_000 });
 
-  const actualizarKm = async (moto: Moto) => {
-    const km = parseInt(kmMoto[moto.id_vehiculo] ?? '');
+  const actualizarKm = async (carro: Carro) => {
+    const km = parseInt(kmCarro[carro.id_vehiculo] ?? '');
     if (isNaN(km) || km < 0) { toast.error('Ingresa un kilómetro válido', 'Error'); return; }
-    setSavingKm(moto.id_vehiculo);
+    setSavingKm(carro.id_vehiculo);
     try {
-      await motosApi.update(moto.id_vehiculo, { kilometraje: km });
-      setMotos(prev => prev.map(m => m.id_vehiculo === moto.id_vehiculo ? { ...m, kilometraje: km } : m));
+      await carrosApi.update(carro.id_vehiculo, { kilometraje: km });
+      setCarros(prev => prev.map(m => m.id_vehiculo === carro.id_vehiculo ? { ...m, kilometraje: km } : m));
       toast.success('Kilometraje actualizado · Recalculando mantenimiento…', 'Mis vehículos');
     } catch (err) {
       toast.error(getErrorMsg(err), 'Error');
@@ -186,12 +186,12 @@ export default function MiMotoPage() {
     }
   };
 
-  const cambiarFotoMoto = async (moto: Moto, file: File) => {
-    setSavingPhotoId(moto.id_vehiculo);
+  const cambiarFotoCarro = async (carro: Carro, file: File) => {
+    setSavingPhotoId(carro.id_vehiculo);
     try {
       const base64 = await comprimirImagen(file);
-      await motosApi.update(moto.id_vehiculo, { ruta_imagen_vehiculo: base64 });
-      setMotos(prev => prev.map(m => m.id_vehiculo === moto.id_vehiculo ? { ...m, ruta_imagen_vehiculo: base64 } : m));
+      await carrosApi.update(carro.id_vehiculo, { ruta_imagen_vehiculo: base64 });
+      setCarros(prev => prev.map(m => m.id_vehiculo === carro.id_vehiculo ? { ...m, ruta_imagen_vehiculo: base64 } : m));
       toast.success('Foto actualizada', 'Mis vehículos');
     } catch {
       toast.error('No se pudo guardar la foto.', 'Foto');
@@ -200,38 +200,38 @@ export default function MiMotoPage() {
     }
   };
 
-  const handleCancelMoto = () => {
-    setAddingMoto(false);
-    resetMoto();
+  const handleCancelCarro = () => {
+    setAddingCarro(false);
+    resetCarro();
     setPhotoFile(null);
     setPhotoDataUrl(null);
     setPhotoPreview(null);
   };
 
-  const onSaveMoto = async (data: MotoForm) => {
+  const onSaveCarro = async (data: CarroForm) => {
     if (!user?.id_usuario) return;
-    setSavingMoto(true);
+    setSavingCarro(true);
     try {
       let fotoBase64: string | null = photoDataUrl;
       if (!fotoBase64 && photoFile) {
         try { fotoBase64 = await comprimirImagen(photoFile); } catch { /* usa la imagen original */ }
       }
-      const { data: nuevaMoto } = await motosApi.create({
+      const { data: nuevoCarro } = await carrosApi.create({
         ...data,
         id_usuario: user.id_usuario,
       });
-      const creada = nuevaMoto as Moto;
+      const creada = nuevoCarro as Carro;
       if (fotoBase64 && creada?.id_vehiculo) {
         try {
-          await motosApi.update(creada.id_vehiculo, { ruta_imagen_vehiculo: fotoBase64 });
+          await carrosApi.update(creada.id_vehiculo, { ruta_imagen_vehiculo: fotoBase64 });
           creada.ruta_imagen_vehiculo = fotoBase64;
         } catch {
           toast.error('El vehículo se creó, pero la foto no se guardó.', 'Foto');
         }
       }
-      setMotos(prev => [...prev, creada]);
-      resetMoto();
-      setAddingMoto(false);
+      setCarros(prev => [...prev, creada]);
+      resetCarro();
+      setAddingCarro(false);
       setPhotoFile(null);
       setPhotoDataUrl(null);
       setPhotoPreview(null);
@@ -239,7 +239,7 @@ export default function MiMotoPage() {
     } catch (err) {
       toast.error(getErrorMsg(err), 'Error al guardar');
     } finally {
-      setSavingMoto(false);
+      setSavingCarro(false);
       setUploadMsg(null);
     }
   };
@@ -429,14 +429,14 @@ export default function MiMotoPage() {
         )}
       </div>
 
-      {loadingMotos ? (
+      {loadingCarros ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
           <svg style={{ animation: 'spin .8s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="rgba(225,20,40,0.2)" strokeWidth="3"/>
             <path d="M12 2a10 10 0 0 1 10 10" stroke="#E11428" strokeWidth="3" strokeLinecap="round"/>
           </svg>
         </div>
-      ) : motos.length === 0 && !addingMoto ? (
+      ) : carros.length === 0 && !addingCarro ? (
         <div style={{ ...card, textAlign: 'center', padding: '48px 24px' }}>
           <div style={{
             width: 72, height: 72, borderRadius: '50%',
@@ -451,59 +451,48 @@ export default function MiMotoPage() {
             Aún no tienes vehículos registrados
           </p>
           <p style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)', fontSize: 13, margin: '0 0 24px', lineHeight: 1.6 }}>
-            Registra tu vehículo para acceder a su historial de servicio.
+            Solicita al taller que registre tu vehículo para consultar su historial.
           </p>
-          <button
-            onClick={() => setAddingMoto(true)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              fontSize: 13, fontWeight: 700, color: '#fff',
-              background: '#E11428',
-              border: 'none', borderRadius: 10, padding: '10px 22px',
-              cursor: 'pointer',
-            }}
-          >
-            <Plus size={15} /> Registrar vehículo
-          </button>
+          
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {motos.map(moto => {
-            const color   = TIPO_COLOR[moto.tipo_vehiculo ?? 'Otro'] ?? '#8A8A9E';
-            const estLocal = calcularEstadoLocal(moto.cilindraje, moto.kilometraje, serviciosMap[moto.id_vehiculo] ?? {});
+          {carros.map(carro => {
+            const color   = TIPO_COLOR[carro.tipo_vehiculo ?? 'Otro'] ?? '#8A8A9E';
+            const estLocal = calcularEstadoLocal(carro.cilindraje, carro.kilometraje, serviciosMap[carro.id_vehiculo] ?? {});
             const hasVenc = estLocal.some(s => s.estado === 'VENCIDO');
             const hasPrx  = estLocal.some(s => s.estado === 'PROXIMO');
             return (
-              <div key={moto.id_vehiculo} style={{ ...card, borderLeft: `3px solid ${color}` }}>
+              <div key={carro.id_vehiculo} style={{ ...card, borderLeft: `3px solid ${color}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: 16 }}>
                   <label style={{ position: 'relative', flexShrink: 0, cursor: 'pointer', display: 'block', width: 56, height: 56 }}
                          title="Cambiar foto de tu vehículo">
-                    {imagenMoto(moto) ? (
-                      <img src={imagenMoto(moto)!} alt={`${moto.marca} ${moto.modelo}`} style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', border: `1px solid ${color}30`, display: 'block' }} />
+                    {imagenCarro(carro) ? (
+                      <img src={imagenCarro(carro)!} alt={`${carro.marca} ${carro.modelo}`} style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', border: `1px solid ${color}30`, display: 'block' }} />
                     ) : (
                       <div style={{ width: 56, height: 56, borderRadius: 12, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Car size={24} color={color} />
                       </div>
                     )}
-                    <span style={{ position: 'absolute', right: -4, bottom: -4, width: 20, height: 20, borderRadius: '50%', background: savingPhotoId === moto.id_vehiculo ? 'rgba(225,20,40,0.5)' : '#E11428', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #16161E' }}>
+                    <span style={{ position: 'absolute', right: -4, bottom: -4, width: 20, height: 20, borderRadius: '50%', background: savingPhotoId === carro.id_vehiculo ? 'rgba(225,20,40,0.5)' : '#E11428', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #16161E' }}>
                       <Camera size={10} color="#fff" />
                     </span>
                     <input type="file" accept="image/*" style={{ display: 'none' }}
-                           disabled={savingPhotoId === moto.id_vehiculo}
-                           onChange={e => { const f = e.target.files?.[0]; if (f) cambiarFotoMoto(moto, f); e.target.value = ''; }} />
+                           disabled={savingPhotoId === carro.id_vehiculo}
+                           onChange={e => { const f = e.target.files?.[0]; if (f) cambiarFotoCarro(carro, f); e.target.value = ''; }} />
                   </label>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 800, fontSize: 16, margin: '0 0 2px', letterSpacing: '-0.02em' }}>
-                      {moto.marca} {moto.modelo}
-                      {moto.nombre_vehiculo && <span style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)', fontWeight: 500, fontSize: 13 }}> — {moto.nombre_vehiculo}</span>}
+                      {carro.marca} {carro.modelo}
+                      {carro.nombre_vehiculo && <span style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)', fontWeight: 500, fontSize: 13 }}> — {carro.nombre_vehiculo}</span>}
                     </p>
                     <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)' }}>Placa: <b style={{ color: isDark ? '#EBEBEB' : '#15151B' }}>{moto.placa}</b></span>
-                      <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)' }}>Año: <b style={{ color: isDark ? '#EBEBEB' : '#15151B' }}>{moto.anio}</b></span>
+                      <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)' }}>Placa: <b style={{ color: isDark ? '#EBEBEB' : '#15151B' }}>{carro.placa}</b></span>
+                      <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)' }}>Año: <b style={{ color: isDark ? '#EBEBEB' : '#15151B' }}>{carro.anio}</b></span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color, padding: '3px 10px', background: `${color}15`, border: `1px solid ${color}25`, borderRadius: 99 }}>{moto.tipo_vehiculo}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color, padding: '3px 10px', background: `${color}15`, border: `1px solid ${color}25`, borderRadius: 99 }}>{carro.tipo_vehiculo}</span>
                     {hasVenc && <span style={{ fontSize: 10, color: '#E11428', background: 'rgba(225,20,40,0.1)', border: '1px solid rgba(225,20,40,0.2)', borderRadius: 99, padding: '2px 8px', fontWeight: 700 }}>Mantenimiento vencido</span>}
                     {!hasVenc && hasPrx && <span style={{ fontSize: 10, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 99, padding: '2px 8px', fontWeight: 700 }}>Próximo mantenimiento</span>}
                     {!hasVenc && !hasPrx && <span style={{ fontSize: 10, color: '#10B981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 99, padding: '2px 8px', fontWeight: 700 }}><CheckCircle size={9} style={{ verticalAlign: 'middle', marginRight: 3 }} />Todo en orden</span>}
@@ -516,17 +505,17 @@ export default function MiMotoPage() {
                     <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(21,21,27,0.6)', flexShrink: 0 }}>Odómetro:</span>
                     <input
                       type="number" min="0"
-                      value={kmMoto[moto.id_vehiculo] ?? ''}
-                      onChange={e => setKmMoto(prev => ({ ...prev, [moto.id_vehiculo]: e.target.value }))}
+                      value={kmCarro[carro.id_vehiculo] ?? ''}
+                      onChange={e => setKmCarro(prev => ({ ...prev, [carro.id_vehiculo]: e.target.value }))}
                       style={{ flex: 1, height: 34, borderRadius: 8, padding: '0 10px', background: isDark ? '#1A1A22' : '#FFFFFF', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E4E7EC', color: isDark ? '#EBEBEB' : '#15151B', fontSize: 13, outline: 'none', minWidth: 0 }}
                     />
                     <span style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(21,21,27,0.45)', flexShrink: 0 }}>km</span>
                   </div>
                   <button
-                    onClick={() => actualizarKm(moto)}
-                    disabled={savingKm === moto.id_vehiculo}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#fff', background: savingKm === moto.id_vehiculo ? 'rgba(225,20,40,0.4)' : '#E11428', border: 'none', borderRadius: 8, padding: '9px 14px', cursor: savingKm === moto.id_vehiculo ? 'not-allowed' : 'pointer', width: '100%' }}>
-                    <Save size={14} /> {savingKm === moto.id_vehiculo ? 'Guardando…' : 'Actualizar Odómetro'}
+                    onClick={() => actualizarKm(carro)}
+                    disabled={savingKm === carro.id_vehiculo}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#fff', background: savingKm === carro.id_vehiculo ? 'rgba(225,20,40,0.4)' : '#E11428', border: 'none', borderRadius: 8, padding: '9px 14px', cursor: savingKm === carro.id_vehiculo ? 'not-allowed' : 'pointer', width: '100%' }}>
+                    <Save size={14} /> {savingKm === carro.id_vehiculo ? 'Guardando…' : 'Actualizar Odómetro'}
                   </button>
                 </div>
 
@@ -534,54 +523,33 @@ export default function MiMotoPage() {
                   <Activity size={13} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'} />
                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)' }}>Estado de mantenimiento</span>
                 </div>
-                <EstadoMotoLive moto={moto} />
+                <EstadoCarroLive carro={carro} />
               </div>
             );
           })}
 
-          {!addingMoto && (
-            <button
-              onClick={() => setAddingMoto(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
-                width: '100%', padding: '13px', borderRadius: 14,
-                background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: isDark ? '1px dashed rgba(255,255,255,0.1)' : '1px dashed rgba(0,0,0,0.1)',
-                color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                transition: 'all 180ms',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(225,20,40,0.3)';
-                (e.currentTarget as HTMLElement).style.color = '#E11428';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-                (e.currentTarget as HTMLElement).style.color = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)';
-              }}
-            >
-              <Plus size={15} /> Agregar otro vehículo
-            </button>
-          )}
+          
         </div>
       )}
 
-      {addingMoto && (
+      {addingCarro && (
         <div style={{ ...card, marginTop: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Plus size={16} color="#E11428" />
               <span style={{ color: isDark ? '#EBEBEB' : '#15151B', fontWeight: 700, fontSize: 15 }}>Registrar vehículo</span>
             </div>
-            <button onClick={handleCancelMoto}
+            <button onClick={handleCancelCarro}
               style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E4E7EC', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.5)' }}>
               <X size={14} />
             </button>
           </div>
 
-          <form onSubmit={handleMoto(onSaveMoto)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={handleCarro(onSaveCarro)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {!perfilOk && (
               <button
                 type="button"
-                onClick={() => { setEditingPerfil(true); setAddingMoto(false); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* WebView antiguo */ } }}
+                onClick={() => { setEditingPerfil(true); setAddingCarro(false); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* WebView antiguo */ } }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
                   background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.28)',
@@ -620,7 +588,7 @@ export default function MiMotoPage() {
                 return esNativo() ? (
                   <div role="button" onClick={onPickPhotoNative} style={boxStyle}>{inner}</div>
                 ) : (
-                  <label htmlFor="moto-photo-input" style={boxStyle}>{inner}</label>
+                  <label htmlFor="carro-photo-input" style={boxStyle}>{inner}</label>
                 );
               })()}
               {photoPreview && (
@@ -632,49 +600,49 @@ export default function MiMotoPage() {
                   <X size={10} /> Quitar foto
                 </button>
               )}
-              <input ref={fileInputRef} id="moto-photo-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={onSelectPhoto} />
+              <input ref={fileInputRef} id="carro-photo-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={onSelectPhoto} />
             </div>
 
             {/* Fila 1 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
-              <Input label="Marca" type="text" placeholder="Ej. Toyota, Chevrolet…" error={errMoto.marca?.message} {...regMoto('marca')} />
-              <Input label="Modelo" type="text" placeholder="Ej. Corolla, Onix…" error={errMoto.modelo?.message} {...regMoto('modelo')} />
+              <Input label="Marca" type="text" placeholder="Ej. Toyota, Chevrolet…" error={errCarro.marca?.message} {...regCarro('marca')} />
+              <Input label="Modelo" type="text" placeholder="Ej. Corolla, Onix…" error={errCarro.modelo?.message} {...regCarro('modelo')} />
             </div>
             {/* Fila 2 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12 }}>
-              <Input label="Placa" type="text" placeholder="ABC-1234" error={errMoto.placa?.message} {...regMoto('placa')} />
-              <Input label="Año" type="number" placeholder={String(new Date().getFullYear())} error={errMoto.anio?.message} {...regMoto('anio')} />
-              <Input label="Nombre (apodo)" type="text" placeholder="Opcional" error={errMoto.nombre_vehiculo?.message} {...regMoto('nombre_vehiculo')} />
+              <Input label="Placa" type="text" placeholder="ABC-1234" error={errCarro.placa?.message} {...regCarro('placa')} />
+              <Input label="Año" type="number" placeholder={String(new Date().getFullYear())} error={errCarro.anio?.message} {...regCarro('anio')} />
+              <Input label="Nombre (apodo)" type="text" placeholder="Opcional" error={errCarro.nombre_vehiculo?.message} {...regCarro('nombre_vehiculo')} />
             </div>
             {/* Fila 3 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12 }}>
-              <Input label="Kilometraje" type="number" placeholder="0" error={errMoto.kilometraje?.message} {...regMoto('kilometraje')} />
-              {/* Tipo de moto */}
+              <Input label="Kilometraje" type="number" placeholder="0" error={errCarro.kilometraje?.message} {...regCarro('kilometraje')} />
+              {/* Tipo de carro */}
               <div>
                 <label style={label}>Tipo de vehículo</label>
                 <select
-                  {...regMoto('tipo_vehiculo')}
+                  {...regCarro('tipo_vehiculo')}
                   style={{
                     width: '100%', height: 42, borderRadius: 10, padding: '0 12px',
-                    background: isDark ? '#1A1A22' : '#FFFFFF', border: `1px solid ${errMoto.tipo_vehiculo ? '#E11428' : (isDark ? 'rgba(255,255,255,0.1)' : '#E4E7EC')}`,
+                    background: isDark ? '#1A1A22' : '#FFFFFF', border: `1px solid ${errCarro.tipo_vehiculo ? '#E11428' : (isDark ? 'rgba(255,255,255,0.1)' : '#E4E7EC')}`,
                     color: isDark ? '#EBEBEB' : '#15151B', fontSize: 13, outline: 'none',
                   }}
                 >
                   <option value="">Selecciona…</option>
                   {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                {errMoto.tipo_vehiculo && <p style={{ color: '#E11428', fontSize: 11, marginTop: 4 }}>{errMoto.tipo_vehiculo.message}</p>}
+                {errCarro.tipo_vehiculo && <p style={{ color: '#E11428', fontSize: 11, marginTop: 4 }}>{errCarro.tipo_vehiculo.message}</p>}
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
-              <button type="button" onClick={handleCancelMoto}
+              <button type="button" onClick={handleCancelCarro}
                 style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '9px 18px', cursor: 'pointer' }}>
                 Cancelar
               </button>
-              <button type="submit" disabled={savingMoto}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#fff', background: savingMoto ? 'rgba(225,20,40,0.4)' : '#E11428', border: 'none', borderRadius: 10, padding: '9px 22px', cursor: savingMoto ? 'not-allowed' : 'pointer' }}>
-                <Save size={14} /> {savingMoto ? (uploadMsg ?? 'Guardando…') : 'Guardar vehículo'}
+              <button type="submit" disabled={savingCarro}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#fff', background: savingCarro ? 'rgba(225,20,40,0.4)' : '#E11428', border: 'none', borderRadius: 10, padding: '9px 22px', cursor: savingCarro ? 'not-allowed' : 'pointer' }}>
+                <Save size={14} /> {savingCarro ? (uploadMsg ?? 'Guardando…') : 'Guardar vehículo'}
               </button>
             </div>
           </form>

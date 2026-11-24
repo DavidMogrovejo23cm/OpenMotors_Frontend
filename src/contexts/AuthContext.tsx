@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   GMotors — Auth Context
+   OpenMotors — Auth Context
    JWT + Firebase Auth (redirect, no popup)
    ───────────────────────────────────────────── */
 
@@ -8,6 +8,14 @@ import {
   useEffect, useCallback, type ReactNode,
 } from 'react';
 import { authApi, tokenVencido } from '../lib/api';
+import {
+  ACTIVITY_KEY,
+  EXPIRED_REASON_KEY,
+  INACTIVITY_TIMEOUT_MS,
+  getLastActivity,
+  isInactiveExpired,
+  recordActivity,
+} from '../lib/inactivity';
 import type { Usuario } from '../types';
 import {
   firebaseEnabled,
@@ -27,7 +35,7 @@ interface AuthCtx extends AuthState {
   login:              (correo: string, contrasena: string) => Promise<void>;
   /** Procesa un FirebaseUser de Google y crea/inicia sesión en el backend. */
   processGoogleUser?: (fbUser: FirebaseUser) => Promise<void>;
-  logout:             () => void;
+  logout:             (reason?: 'manual' | 'inactivity') => void;
   isAdmin:    boolean;
   isMecanico: boolean;
   isCliente:  boolean;
@@ -91,11 +99,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(async res => {
         if (cancelled) return; // respuesta tardía: el contexto ya cambió
         // Si el usuario ya no existe en BD (fue borrado) → cerrar sesión automáticamente
-        if (res.status === 404 || (res.status === 401 && tokenVencido(token))) {
+        if (res.status === 404 || res.status === 401) {
+          if (res.status === 401 && !tokenVencido(token)) {
+            const errBody = await res.clone().json().catch(() => null) as { detail?: string } | null;
+            const detail = (errBody?.detail ?? '').toLowerCase();
+            const revoked = detail.includes('suspendida') || detail.includes('invalidada') || detail.includes('cerrada');
+            if (!revoked) return;
+          }
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(ACTIVITY_KEY);
           setState({ user: null, token: null, loading: false });
-          window.location.href = '/login';
+          window.location.replace('/login');
           return;
         }
         if (!res.ok) return; // servidor dormido / error temporal → mantener datos guardados
@@ -139,11 +154,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
         if (cancelled) return;
-        if (res.status === 404 || (res.status === 401 && tokenVencido(token))) {
+        if (res.status === 404 || res.status === 401) {
+          if (res.status === 401 && !tokenVencido(token)) {
+            const errBody = await res.clone().json().catch(() => null) as { detail?: string } | null;
+            const detail = (errBody?.detail ?? '').toLowerCase();
+            const revoked = detail.includes('suspendida') || detail.includes('invalidada') || detail.includes('cerrada');
+            if (!revoked) return;
+          }
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(ACTIVITY_KEY);
           setState({ user: null, token: null, loading: false });
-          window.location.href = '/login';
+          window.location.replace('/login');
           return;
         }
         if (!res.ok) return;
@@ -181,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!token || !user) throw new Error('Respuesta del servidor inválida. Intenta nuevamente.');
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(USER_KEY,  JSON.stringify(user));
+      recordActivity(localStorage);
       setState({ user, token, loading: false });
     } catch (err) {
       setState((s) => ({ ...s, loading: false }));
@@ -188,62 +211,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  /**
-   * Procesa el FirebaseUser obtenido tras Google redirect.
-   * Inicia sesión con una cuenta existente.
-   * No abre popup — el redirect ya fue manejado por LoginPage.
-   */
-  const processGoogleUserCb = useCallback(async (fbUser: FirebaseUser) => {
-        setState((s) => ({ ...s, loading: true }));
-        try {
-          /* Admin usa contraseña fija; otros Google-users usan su UID */
-          const googlePass = fbUser.email === 'OpenMotors2026@gmail.com'
-            ? 'OpenMotors.2026.cuenca'
-            : `gm_google_${fbUser.uid.slice(0, 16)}`;
-          let token: string | undefined;
-          let user:  Usuario | undefined;
+  const processGoogleUser = undefined;
 
-          /* 1. Login directo con contraseña determinista */
-          try {
-            const { data } = await authApi.login(fbUser.email!, googlePass);
-            ({ token, user } = extractAuth(data));
-          } catch (loginErr: unknown) {
-            const st = (loginErr as { response?: { status?: number } })?.response?.status;
-            // Si el backend NO respondió (red caída / Render dormido) o dio 5xx,
-            // NO asumir "primera vez" ni registrar: es un fallo del servidor.
-            if (st === undefined) {
-              throw new Error('No se pudo conectar con el servidor. Intenta de nuevo en un momento.', { cause: loginErr });
-            }
-            if (st >= 500) {
-              throw new Error('El servidor tuvo un problema temporal. Intenta de nuevo.', { cause: loginErr });
-            }
-            throw new Error('Ingresa con la contraseña de tu cuenta o contacta al taller para solicitar acceso.', { cause: loginErr });
-          }
-
-          /* Validar que recibimos sesión válida */
-          if (!token || !user) {
-            throw new Error('El servidor no devolvió una sesión válida. Intenta nuevamente.');
-          }
-
-          localStorage.setItem(TOKEN_KEY, token);
-          localStorage.setItem(USER_KEY,  JSON.stringify(user));
-          setState({ user, token, loading: false });
-        } catch (err) {
-          await firebaseSignOut().catch(() => {});
-          setState((s) => ({ ...s, loading: false }));
-          throw err;
-        }
-      }, []);
-  /* Solo se expone si Firebase está configurado (mantiene la semántica previa) */
-  const processGoogleUser = firebaseEnabled ? processGoogleUserCb : undefined;
-
-  const logout = useCallback(() => {
+  const logout = useCallback((reason: 'manual' | 'inactivity' = 'manual') => {
+    const tokenActual = localStorage.getItem(TOKEN_KEY);
+    if (tokenActual) {
+      authApi.logout().catch(() => {});
+    }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(ACTIVITY_KEY);
+    if (reason === 'inactivity') {
+      sessionStorage.setItem(EXPIRED_REASON_KEY, 'inactivity');
+    }
     setState({ user: null, token: null, loading: false });
-    window.location.href = '/login';
+    window.location.replace(reason === 'inactivity' ? '/login?expired=1' : '/login');
     if (firebaseEnabled) firebaseSignOut().catch(() => {});
   }, []);
+
+  /* ── Control de expiración por inactividad (30 minutos sin interacción) ── */
+  useEffect(() => {
+    if (!state.token) return;
+    if (getLastActivity(localStorage) === null) {
+      recordActivity(localStorage);
+    }
+
+    let lastWrite = Date.now();
+    const touch = () => {
+      const now = Date.now();
+      if (now - lastWrite >= 5_000) {
+        lastWrite = now;
+        recordActivity(localStorage, now);
+      }
+    };
+
+    const checkExpiry = () => {
+      if (!localStorage.getItem(TOKEN_KEY)) return;
+      const last = getLastActivity(localStorage);
+      if (isInactiveExpired(last, Date.now(), INACTIVITY_TIMEOUT_MS)) {
+        logout('inactivity');
+      }
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'] as const;
+    events.forEach(ev => window.addEventListener(ev, touch, { passive: true }));
+    const onVis = () => { if (document.visibilityState === 'visible') checkExpiry(); };
+    document.addEventListener('visibilitychange', onVis);
+    const timer = window.setInterval(checkExpiry, 15_000);
+
+    return () => {
+      events.forEach(ev => window.removeEventListener(ev, touch));
+      document.removeEventListener('visibilitychange', onVis);
+      window.clearInterval(timer);
+    };
+  }, [state.token, logout]);
 
   type StoredRole = { estado?: number; nombre?: string; rol?: { nombre?: string } };
   const storedRoles = (state.user?.roles ?? []) as unknown[];
